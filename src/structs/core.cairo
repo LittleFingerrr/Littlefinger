@@ -1,13 +1,15 @@
 use starknet::ContractAddress;
+// use super::member_structs::MemberConfig;
+// use super::organization::{OrganizationConfig, OwnerInit};
+// use super::voting::PollConfigParams;
 
+// do not use this..
 #[derive(Drop, Copy, PartialEq, Serde, Default)]
-pub struct CoreConfigParams {
-    pub visibility: Option<Visibility>,
+pub struct CoreConfigParams { // is promotion automatic? pass in the available algorithms, based on what?
 }
 
 #[starknet::storage_node]
-pub struct CoreConfig {
-}
+pub struct CoreConfig {}
 
 #[derive(Drop, Copy, Serde, PartialEq, Default)]
 pub enum Visibility {
@@ -19,7 +21,7 @@ pub enum Visibility {
 #[derive(Drop, Copy, Serde, PartialEq, Default)]
 pub struct PaymentConfig {
     pub broker: Option<ContractAddress>,
-    pub payment_type: PaymentType,
+    pub payment_type: Option<PaymentType>,
 }
 
 // There might be other payment types available for this Config
@@ -35,17 +37,11 @@ pub enum PaymentType {
 pub struct StreamDetails { // init stream details
 }
 
-#[derive(Drop, Copy, Serde, Default, PartialEq)]
-pub struct PollConfigParams {
-
+pub fn get_default_stream_details() -> StreamDetails {
+    Default::default()
 }
 
 #[starknet::storage_node]
-pub struct PollConfig {
-
-}
-
-pub fn get_default_stream_details() -> StreamDetails {
-    Default::default()
+pub struct CoreConfigNode { // params: CoreConfigParams,
 }
 

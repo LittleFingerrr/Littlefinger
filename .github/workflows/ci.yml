@@ -1,0 +1,43 @@
+name: Littlefinger CI
+
+on:
+  push:
+    branches: 
+      - master
+      - '**'
+  pull_request:
+    branches:
+      - master
+      - '**'
+
+jobs:
+  build-and-test-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+    
+      - name: Install Scarb
+        uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: "2.11.2"
+
+      - name: Install asdf
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Install Starknet Foundry
+        run: |
+          asdf plugin add starknet-foundry || true
+          asdf install starknet-foundry 0.40.0
+          asdf global starknet-foundry 0.40.0
+      - name: Build and Test Contracts
+        run: |
+          scarb build
+          scarb test
+          scarb fmt --check
