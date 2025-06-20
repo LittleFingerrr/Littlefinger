@@ -5,8 +5,8 @@ pub mod MemberManagerComponent {
     use littlefinger::interfaces::imember_manager::IMemberManager;
     use littlefinger::structs::member_structs::{
         InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails, MemberEnum,
-        MemberEvent, MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole,
-        MemberStatus, MemberTrait,
+        MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole, MemberStatus,
+        MemberTrait,
     };
     use starknet::storage::{
         Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
@@ -73,7 +73,7 @@ pub mod MemberManagerComponent {
             assert(self.admin_ca.entry(caller).read(), 'Caller Not an Admin');
             let member_node = self.members.entry(member_id);
             let mut member = member_node.member.read();
-            let old_role = member.role;
+            // let old_role = member.role;
 
             //TODO: When you add events to this, you'll get something from here
 

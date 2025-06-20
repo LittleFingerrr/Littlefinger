@@ -132,9 +132,6 @@ mod Core {
 
     #[abi(embed_v0)]
     impl CoreImpl of ICore<ContractState> {
-        // fn add_admin(ref self: ContractState, member_id: u256) {
-        //     // let member_node = self.member.members.entry(member_id);
-        // }
         fn initialize_disbursement_schedule(
             ref self: ContractState,
             schedule_type: u8,
