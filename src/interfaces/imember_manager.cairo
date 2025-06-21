@@ -8,9 +8,8 @@ pub trait IMemberManager<TContractState> {
         fname: felt252,
         lname: felt252,
         alias: felt252,
-        role: MemberRole,
+        role: u16, // Role goes from 0 to 14
         address: ContractAddress,
-        // base_pay: u256
     // weight: u256
     ); //-> u256;
     fn add_admin(ref self: TContractState, member_id: u256);
