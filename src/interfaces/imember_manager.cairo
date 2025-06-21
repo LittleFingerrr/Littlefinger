@@ -10,7 +10,7 @@ pub trait IMemberManager<TContractState> {
         alias: felt252,
         role: u16, // Role goes from 0 to 14
         address: ContractAddress,
-    // weight: u256
+        // weight: u256
     ); //-> u256;
     fn add_admin(ref self: TContractState, member_id: u256);
     fn invite_member(

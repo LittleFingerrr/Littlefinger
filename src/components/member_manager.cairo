@@ -54,7 +54,7 @@ pub mod MemberManagerComponent {
             let reg_time = get_block_timestamp();
             let status: MemberStatus = Default::default();
             let member = self.members.entry(id);
-            
+
             let mut member_role = MemberRole::None;
 
             match role {
@@ -62,7 +62,7 @@ pub mod MemberManagerComponent {
                 1 | 2 | 3 | 4 => { member_role = MemberRole::CONTRACTOR(role) },
                 5 | 6 | 7 | 8 | 9 | 10 => { member_role = MemberRole::EMPLOYEE(role) },
                 11 | 12 | 13 | 14 => { member_role = MemberRole::ADMIN(role) },
-                _ => { member_role = MemberRole::None }
+                _ => { member_role = MemberRole::None },
             }
 
             let (new_member, details) = MemberTrait::with_details(

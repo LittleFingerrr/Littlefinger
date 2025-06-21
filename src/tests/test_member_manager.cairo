@@ -3,8 +3,8 @@ use littlefinger::interfaces::imember_manager::{
 };
 use littlefinger::structs::member_structs::{
     InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails, MemberEnum, MemberEvent,
-    MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole, MemberStatus, MemberTrait,
-    MemberRoleIntoU16
+    MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole, MemberRoleIntoU16,
+    MemberStatus, MemberTrait,
 };
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
 use snforge_std::{
