@@ -45,7 +45,6 @@ pub struct Member {
 #[derive(Copy, Drop, Serde, Default, PartialEq, starknet::Store)]
 pub struct MemberInvite {
     pub address: ContractAddress,
-    // pub status: MemberStatus,
     pub role: MemberRole,
     pub base_pay: u256,
     pub invite_status: InviteStatus,
@@ -89,8 +88,10 @@ pub enum MemberRole {
 // subject to change, but hard coded for now
 // may be subject to customization
 pub const CONTRACTOR: u16 = 1; //will use zero to index
-pub const EMPLOYEE: u16 = 3; // will use one to index
-pub const ADMIN: u16 = 20; // will use 2 to index
+pub const EMPLOYEE: u16 = 4; // will use one to index
+pub const ADMIN: u16 = 11; // will use 2 to index
+
+// We generally don't want any weight to get above 14
 
 // use a function called get_role_value()
 
@@ -99,9 +100,9 @@ pub impl MemberRoleIntoU16 of Into<MemberRole, u16> {
     #[inline(always)]
     fn into(self: MemberRole) -> u16 {
         match self {
-            MemberRole::EMPLOYEE(val) => EMPLOYEE * val,
-            MemberRole::ADMIN(val) => ADMIN * val,
-            MemberRole::CONTRACTOR(val) => CONTRACTOR * val,
+            MemberRole::EMPLOYEE(val) => val,
+            MemberRole::ADMIN(val) => val,
+            MemberRole::CONTRACTOR(val) => val,
             _ => 0,
         }
     }

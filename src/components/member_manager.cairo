@@ -41,9 +41,8 @@ pub mod MemberManagerComponent {
             fname: felt252,
             lname: felt252,
             alias: felt252,
-            role: MemberRole,
+            role: u16, //Role is from 0 - 14
             address: ContractAddress,
-            // base_pay: u256
         ) {
             // In this implementation, we are imagining the person who wants to register is calling
             // the function with their wallet actually.
@@ -56,11 +55,20 @@ pub mod MemberManagerComponent {
             let status: MemberStatus = Default::default();
             let member = self.members.entry(id);
 
+            let mut member_role = MemberRole::None;
+
+            match role {
+                0 => { member_role = MemberRole::None },
+                1 | 2 | 3 | 4 => { member_role = MemberRole::CONTRACTOR(role) },
+                5 | 6 | 7 | 8 | 9 | 10 => { member_role = MemberRole::EMPLOYEE(role) },
+                11 | 12 | 13 | 14 => { member_role = MemberRole::ADMIN(role) },
+                _ => { member_role = MemberRole::None },
+            }
+
             let (new_member, details) = MemberTrait::with_details(
-                id, fname, lname, status, role, alias, address, 0,
+                id, fname, lname, status, member_role, alias, address, 0,
             );
             member.details.write(details);
-            // member.base_pay.write(base_pay);
             member.member.write(new_member);
             member.reg_time.write(reg_time);
             member.total_received.write(Option::Some(0));
