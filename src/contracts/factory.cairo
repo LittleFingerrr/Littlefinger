@@ -109,7 +109,7 @@ pub mod Factory {
             first_admin_fname: felt252,
             first_admin_lname: felt252,
             first_admin_alias: felt252,
-            organization_type: u8
+            organization_type: u8,
             // salt: felt252,
         ) -> (ContractAddress, ContractAddress) {
             // let deployer = get_caller_address();
@@ -125,7 +125,7 @@ pub mod Factory {
                     first_admin_lname,
                     first_admin_alias,
                     salt + 1,
-                    organization_type
+                    organization_type,
                 );
             self.vault_org_pairs.entry(owner).write((org_core_address, vault_address));
             let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
@@ -229,7 +229,7 @@ pub mod Factory {
             first_admin_lname: felt252,
             first_admin_alias: felt252,
             salt: felt252,
-            organization_type: u8
+            organization_type: u8,
         ) -> ContractAddress {
             let deployer = get_caller_address();
             let org_count = self.orgs_count.read();

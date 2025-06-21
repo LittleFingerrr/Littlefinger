@@ -6,10 +6,10 @@ pub mod VotingComponent {
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     // use crate::interfaces::icore::IConfig;
     use crate::interfaces::voting::IVote;
-    use crate::structs::member_structs::{MemberTrait, MemberRoleIntoU16};
+    use crate::structs::member_structs::{MemberRoleIntoU16, MemberTrait};
     use crate::structs::voting::{
-        Poll, PollReason, PollStatus, PollTrait, Voted, VotingConfig, VotingConfigNode, PollResolved, PollCreated, 
-        PollStopped, ThresholdChanged
+        Poll, PollCreated, PollReason, PollResolved, PollStatus, PollStopped, PollTrait,
+        ThresholdChanged, Voted, VotingConfig, VotingConfigNode,
     };
     use super::super::member_manager::MemberManagerComponent;
 
@@ -22,7 +22,7 @@ pub mod VotingComponent {
         pub generic_threshold: u256,
         pub min_role_for_voting: u16,
         pub min_role_for_polling: u16,
-        pub min_role_for_executing: u16
+        pub min_role_for_executing: u16,
     }
 
     #[event]
@@ -32,7 +32,7 @@ pub mod VotingComponent {
         PollResolved: PollResolved,
         PollCreated: PollCreated,
         PollStopped: PollStopped,
-        ThresholdChanged: ThresholdChanged
+        ThresholdChanged: ThresholdChanged,
     }
 
     #[embeddable_as(VotingImpl)]
@@ -50,7 +50,8 @@ pub mod VotingComponent {
         fn create_poll(
             ref self: ComponentState<TContractState>, // name: ByteArray,
             // desc: ByteArray,
-            member_id: u256, reason: PollReason,
+            member_id: u256,
+            reason: PollReason,
         ) -> u256 {
             let caller = get_caller_address();
             let mc = get_dep_component!(@self, Member);
@@ -71,14 +72,10 @@ pub mod VotingComponent {
 
             self.polls.entry(id).write(poll);
             self.no_of_polls.write(self.no_of_polls.read() + 1);
-            self.emit(
-                PollCreated {
-                    id,
-                    proposer: caller,
-                    reason,
-                    timestamp: get_block_timestamp(),
-                }
-            );
+            self
+                .emit(
+                    PollCreated { id, proposer: caller, reason, timestamp: get_block_timestamp() },
+                );
             id
         }
 
@@ -110,13 +107,7 @@ pub mod VotingComponent {
 
             if poll.up_votes >= threshold {
                 let outcome = poll.resolve();
-                self.emit(
-                    PollResolved {
-                        id: poll_id,
-                        outcome,
-                        timestamp,
-                    }
-                )
+                self.emit(PollResolved { id: poll_id, outcome, timestamp })
             }
             self.has_voted.entry((caller, poll_id)).write(true);
             self.emit(Voted { id: poll_id, voter: caller, timestamp });
@@ -150,13 +141,7 @@ pub mod VotingComponent {
 
             if max_no_of_possible_approvals < threshold {
                 let outcome = poll.resolve();
-                self.emit(
-                    PollResolved {
-                        id: poll_id,
-                        outcome,
-                        timestamp,
-                    }
-                )
+                self.emit(PollResolved { id: poll_id, outcome, timestamp })
             }
 
             self.has_voted.entry((caller, poll_id)).write(true);
@@ -165,7 +150,9 @@ pub mod VotingComponent {
             self.polls.entry(poll_id).write(poll);
         }
 
-        fn set_threshold(ref self: ComponentState<TContractState>, new_threshold: u256, member_id: u256) {
+        fn set_threshold(
+            ref self: ComponentState<TContractState>, new_threshold: u256, member_id: u256,
+        ) {
             // Protect this with permissions later
             let caller = get_caller_address();
             let mc = get_dep_component!(@self, Member);
@@ -177,13 +164,12 @@ pub mod VotingComponent {
 
             let previous_threshold = self.generic_threshold.read();
             self.generic_threshold.write(new_threshold);
-            self.emit(
-                ThresholdChanged {
-                    previous_threshold,
-                    new_threshold,
-                    timestamp: get_block_timestamp(),
-                }
-            );
+            self
+                .emit(
+                    ThresholdChanged {
+                        previous_threshold, new_threshold, timestamp: get_block_timestamp(),
+                    },
+                );
         }
 
         fn get_all_polls(self: @ComponentState<TContractState>) -> Array<Poll> {

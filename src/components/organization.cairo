@@ -8,7 +8,7 @@ pub mod OrganizationComponent {
     use crate::interfaces::iorganization::IOrganization;
     // use crate::structs::member_structs::MemberTrait;
     use crate::structs::organization::{
-        OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType
+        OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
 
@@ -79,7 +79,7 @@ pub mod OrganizationComponent {
             match organization_type {
                 1 => processed_org_type = OrganizationType::DECENTRALIZED,
                 0 | _ => processed_org_type = OrganizationType::CENTRALIZED,
-            };
+            }
 
             let organization_info = OrganizationInfo {
                 org_id,
@@ -89,7 +89,7 @@ pub mod OrganizationComponent {
                 ipfs_url,
                 vault_address,
                 created_at: current_timestamp,
-                organization_type: processed_org_type
+                organization_type: processed_org_type,
             };
             self.org_info.write(organization_info);
             self.deployer.write(deployer);

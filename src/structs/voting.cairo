@@ -100,7 +100,7 @@ pub struct PollCreated {
     #[key]
     pub proposer: ContractAddress,
     pub reason: PollReason,
-    pub timestamp: u64
+    pub timestamp: u64,
 }
 
 #[derive(Drop, starknet::Event)]
@@ -115,7 +115,7 @@ pub struct PollStopped {
 pub struct ThresholdChanged {
     pub previous_threshold: u256,
     pub new_threshold: u256,
-    pub timestamp: u64
+    pub timestamp: u64,
 }
 
 #[derive(Drop, starknet::Event)]
@@ -160,9 +160,9 @@ pub fn default_voting_config_init() -> VotingConfig {
     // for now
     Default::default()
 }
-
 // #[derive(Drop, Copy, Serde, Default, PartialEq)]
 // pub struct PollConfigParams {}
 
 // #[starknet::storage_node]
 // pub struct PollConfig {}
+
