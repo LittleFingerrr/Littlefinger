@@ -161,8 +161,4 @@ pub fn default_voting_config_init() -> VotingConfig {
     Default::default()
 }
 // #[derive(Drop, Copy, Serde, Default, PartialEq)]
-// pub struct PollConfigParams {}
-
-// #[starknet::storage_node]
-// pub struct PollConfig {}
 
