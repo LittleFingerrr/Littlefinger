@@ -8,7 +8,7 @@ pub mod OrganizationComponent {
     use crate::interfaces::iorganization::IOrganization;
     // use crate::structs::member_structs::MemberTrait;
     use crate::structs::organization::{
-        OrganizationConfig, OrganizationConfigNode, OrganizationInfo,
+        OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
 
@@ -65,6 +65,7 @@ pub mod OrganizationComponent {
             org_id: u256,
             // organization_info: OrganizationInfo,
             deployer: ContractAddress,
+            organization_type: u8,
         ) {
             let caller = get_caller_address();
             let mut ascribed_owner = caller;
@@ -72,6 +73,14 @@ pub mod OrganizationComponent {
                 ascribed_owner = owner.unwrap();
             }
             let current_timestamp = get_block_timestamp();
+
+            let mut processed_org_type = OrganizationType::CENTRALIZED;
+
+            match organization_type {
+                1 => processed_org_type = OrganizationType::DECENTRALIZED,
+                0 | _ => processed_org_type = OrganizationType::CENTRALIZED,
+            }
+
             let organization_info = OrganizationInfo {
                 org_id,
                 name,
@@ -80,6 +89,7 @@ pub mod OrganizationComponent {
                 ipfs_url,
                 vault_address,
                 created_at: current_timestamp,
+                organization_type: processed_org_type,
             };
             self.org_info.write(organization_info);
             self.deployer.write(deployer);

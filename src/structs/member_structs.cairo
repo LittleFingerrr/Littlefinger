@@ -42,7 +42,7 @@ pub struct Member {
     // pub base_pay: u256,
 }
 
-#[derive(Copy, Drop, Serde, PartialEq, starknet::Store)]
+#[derive(Copy, Drop, Serde, Default, PartialEq, starknet::Store)]
 pub struct MemberInvite {
     pub address: ContractAddress,
     pub role: MemberRole,
@@ -51,7 +51,7 @@ pub struct MemberInvite {
     pub expiry: u64,
 }
 
-#[derive(Copy, Drop, Serde, PartialEq, starknet::Store)]
+#[derive(Copy, Drop, Serde, Default, PartialEq, starknet::Store)]
 pub enum InviteStatus {
     #[default]
     PENDING,

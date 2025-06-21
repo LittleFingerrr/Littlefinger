@@ -2,7 +2,7 @@ use starknet::ContractAddress;
 use starknet::storage::Vec;
 use crate::structs::base::ContractAddressDefault;
 
-#[derive(Drop, Serde, Clone, Default, PartialEq, starknet::Store)]
+#[derive(Drop, Serde, Clone, PartialEq, starknet::Store)]
 pub struct OrganizationInfo {
     pub org_id: u256,
     pub name: ByteArray,
@@ -12,6 +12,14 @@ pub struct OrganizationInfo {
     pub ipfs_url: ByteArray,
     pub vault_address: ContractAddress,
     pub created_at: u64,
+    pub organization_type: OrganizationType,
+}
+
+#[derive(Copy, Drop, Serde, PartialEq, starknet::Store)]
+pub enum OrganizationType {
+    #[default]
+    CENTRALIZED,
+    DECENTRALIZED,
 }
 
 

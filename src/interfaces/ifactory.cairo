@@ -45,6 +45,7 @@ pub trait IFactory<T> {
         first_admin_fname: felt252,
         first_admin_lname: felt252,
         first_admin_alias: felt252,
+        organization_type: u8,
         // salt: felt252,
     ) -> (ContractAddress, ContractAddress);
     fn get_deployed_vaults(self: @T) -> Array<ContractAddress>;
