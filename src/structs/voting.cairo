@@ -160,5 +160,3 @@ pub fn default_voting_config_init() -> VotingConfig {
     // for now
     Default::default()
 }
-// #[derive(Drop, Copy, Serde, Default, PartialEq)]
-
