@@ -4,6 +4,7 @@ use littlefinger::interfaces::imember_manager::{
 use littlefinger::structs::member_structs::{
     InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails, MemberEnum, MemberEvent,
     MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole, MemberStatus, MemberTrait,
+    MemberRoleIntoU16
 };
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
 use snforge_std::{
@@ -46,8 +47,8 @@ fn admin_details() -> (felt252, felt252, felt252) {
     ('Admin', 'User', 'adminuser')
 }
 
-fn member_details() -> (felt252, felt252, felt252, MemberRole, ContractAddress) {
-    ('John', 'Doe', 'johndoe', MemberRole::EMPLOYEE(5), member())
+fn member_details() -> (felt252, felt252, felt252, u16, ContractAddress) {
+    ('John', 'Doe', 'johndoe', 5, member())
 }
 
 fn member() -> ContractAddress {
@@ -75,7 +76,7 @@ fn test_add_member_successful() {
     assert(member_response.fname == fname, 'Wrong first name');
     assert(member_response.lname == lname, 'Wrong last name');
     assert(member_response.alias == alias, 'Wrong alias');
-    assert(member_response.role == role, 'Wrong role');
+    assert(MemberRoleIntoU16::into(member_response.role) == role, 'Wrong role');
     assert(member_response.address == member, 'Wrong address');
 }
 
@@ -96,7 +97,7 @@ fn test_add_admin_successful() {
     assert(member_response.fname == fname, 'Wrong first name');
     assert(member_response.lname == lname, 'Wrong last name');
     assert(member_response.alias == alias, 'Wrong alias');
-    assert(member_response.role == role, 'Wrong role');
+    assert(MemberRoleIntoU16::into(member_response.role) == role, 'Wrong role');
     assert(member_response.address == member, 'Wrong address');
 
     start_cheat_caller_address(mock_contract.contract_address, admin);
@@ -229,7 +230,7 @@ fn test_get_members() {
     let fname2 = 'Jane';
     let lname2 = 'Smith';
     let alias2 = 'janesmith';
-    let role2 = MemberRole::CONTRACTOR(3);
+    let role2 = 3;
     let member2_addr = member2();
 
     // Add first member
@@ -336,7 +337,7 @@ fn test_get_role_value() {
 
     // Add member first
     start_cheat_caller_address(mock_contract.contract_address, member_addr);
-    mock_contract.add_member('John', 'Doe', 'johndoe', MemberRole::EMPLOYEE(5), member_addr);
+    mock_contract.add_member('John', 'Doe', 'johndoe', 5, member_addr);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     let role = mock_contract.get_member(2).role;
@@ -368,7 +369,7 @@ fn test_add_member_zero_address() {
 
     start_cheat_caller_address(mock_contract.contract_address, contract_address_const::<0>());
 
-    mock_contract.add_member('John', 'Doe', 'johndoe', MemberRole::EMPLOYEE(5), member());
+    mock_contract.add_member('John', 'Doe', 'johndoe', 5, member());
 
     stop_cheat_caller_address(mock_contract.contract_address);
 }
