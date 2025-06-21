@@ -48,6 +48,7 @@ fn setup_org_helper() -> (ContractAddress, IFactoryDispatcher, ContractAddress, 
             first_admin_fname: 'test_fname',
             first_admin_lname: 'test_lname',
             first_admin_alias: 'test_alias',
+            organization_type: 1
         );
     (contract_address, dispatcher, org_address, vault_address)
 }

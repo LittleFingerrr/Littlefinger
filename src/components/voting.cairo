@@ -6,9 +6,10 @@ pub mod VotingComponent {
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     // use crate::interfaces::icore::IConfig;
     use crate::interfaces::voting::IVote;
-    use crate::structs::member_structs::MemberTrait;
+    use crate::structs::member_structs::{MemberTrait, MemberRoleIntoU16};
     use crate::structs::voting::{
-        Poll, PollConfig, PollReason, PollStatus, PollTrait, Voted, VotingConfig, VotingConfigNode,
+        Poll, PollReason, PollStatus, PollTrait, Voted, VotingConfig, VotingConfigNode, PollResolved, PollCreated, 
+        PollStopped, ThresholdChanged
     };
     use super::super::member_manager::MemberManagerComponent;
 
@@ -19,12 +20,19 @@ pub mod VotingComponent {
         pub no_of_polls: u256,
         pub config: VotingConfigNode,
         pub generic_threshold: u256,
+        pub min_role_for_voting: u16,
+        pub min_role_for_polling: u16,
+        pub min_role_for_executing: u16
     }
 
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         Voted: Voted,
+        PollResolved: PollResolved,
+        PollCreated: PollCreated,
+        PollStopped: PollStopped,
+        ThresholdChanged: ThresholdChanged
     }
 
     #[embeddable_as(VotingImpl)]
@@ -48,6 +56,8 @@ pub mod VotingComponent {
             let mc = get_dep_component!(@self, Member);
             let member = mc.members.entry(member_id).member.read();
             member.verify(caller);
+            let role_in_u16 = MemberRoleIntoU16::into(member.role);
+            assert(role_in_u16 >= self.min_role_for_polling.read(), 'Not qualified to poll');
             let id = self.no_of_polls.read();
             let poll = Poll {
                 proposer: member_id,
@@ -55,27 +65,42 @@ pub mod VotingComponent {
                 reason,
                 up_votes: 0,
                 down_votes: 0,
-                status: PollStatus::Pending,
+                status: PollStatus::ACTIVE,
                 created_at: get_block_timestamp(),
             };
 
             self.polls.entry(id).write(poll);
             self.no_of_polls.write(self.no_of_polls.read() + 1);
+            self.emit(
+                PollCreated {
+                    id,
+                    proposer: caller,
+                    reason,
+                    timestamp: get_block_timestamp(),
+                }
+            );
             id
         }
 
-        fn vote(ref self: ComponentState<TContractState>, support: bool, poll_id: u256) {
+        fn approve(ref self: ComponentState<TContractState>, poll_id: u256, member_id: u256) {
+            let caller = get_caller_address();
+            let mc = get_dep_component!(@self, Member);
+            let member = mc.members.entry(member_id).member.read();
+            member.verify(caller);
+
+            let role_in_u16 = MemberRoleIntoU16::into(member.role);
+            assert(role_in_u16 >= self.min_role_for_voting.read(), 'Not qualified to poll');
+
             let mut poll = self.polls.entry(poll_id).read();
             assert(poll != Default::default(), 'INVALID POLL');
-            assert(poll.status == Default::default(), 'POLL NOT PENDING');
-            let caller = get_caller_address();
+            assert(poll.status == PollStatus::ACTIVE, 'POLL NOT ACTIVE');
+
             let has_voted = self.has_voted.entry((caller, poll_id)).read();
             assert(!has_voted, 'CALLER HAS VOTED');
 
-            match support {
-                true => poll.up_votes += 1,
-                _ => poll.down_votes += 1,
-            }
+            let timestamp = get_block_timestamp();
+
+            poll.up_votes += 1;
 
             let threshold = self.generic_threshold.read();
             // Right now, the threshold means the number of people that will vote in the election
@@ -83,20 +108,82 @@ pub mod VotingComponent {
             // required for the poll to be deemed wrong or right. However, do not try to implement
             // this until the permission control component is added to the codebase
 
-            let vote_count = poll.up_votes + poll.down_votes;
-            if vote_count >= threshold {
-                poll.resolve();
-                // emit a Poll Resolved Event
+            if poll.up_votes >= threshold {
+                let outcome = poll.resolve();
+                self.emit(
+                    PollResolved {
+                        id: poll_id,
+                        outcome,
+                        timestamp,
+                    }
+                )
             }
             self.has_voted.entry((caller, poll_id)).write(true);
-            self.emit(Voted { id: poll_id, voter: caller });
+            self.emit(Voted { id: poll_id, voter: caller, timestamp });
 
             self.polls.entry(poll_id).write(poll);
         }
 
-        fn set_threshold(ref self: ComponentState<TContractState>, threshold: u256) {
+        fn reject(ref self: ComponentState<TContractState>, poll_id: u256, member_id: u256) {
+            let caller = get_caller_address();
+            let mc = get_dep_component!(@self, Member);
+            let member = mc.members.entry(member_id).member.read();
+            member.verify(caller);
+
+            let role_in_u16 = MemberRoleIntoU16::into(member.role);
+            assert(role_in_u16 >= self.min_role_for_voting.read(), 'Not qualified to poll');
+
+            let mut poll = self.polls.entry(poll_id).read();
+            assert(poll != Default::default(), 'INVALID POLL');
+            assert(poll.status == PollStatus::ACTIVE, 'POLL NOT ACTIVE');
+
+            let has_voted = self.has_voted.entry((caller, poll_id)).read();
+            assert(!has_voted, 'CALLER HAS VOTED');
+            let timestamp = get_block_timestamp();
+
+            poll.down_votes += 1;
+
+            let threshold = self.generic_threshold.read();
+
+            let max_possible_of_voters: u256 = self.get_eligible_voters().len().into();
+            let max_no_of_possible_approvals = max_possible_of_voters - poll.down_votes;
+
+            if max_no_of_possible_approvals < threshold {
+                let outcome = poll.resolve();
+                self.emit(
+                    PollResolved {
+                        id: poll_id,
+                        outcome,
+                        timestamp,
+                    }
+                )
+            }
+
+            self.has_voted.entry((caller, poll_id)).write(true);
+            self.emit(Voted { id: poll_id, voter: caller, timestamp });
+
+            self.polls.entry(poll_id).write(poll);
+        }
+
+        fn set_threshold(ref self: ComponentState<TContractState>, new_threshold: u256, member_id: u256) {
             // Protect this with permissions later
-            self.generic_threshold.write(threshold);
+            let caller = get_caller_address();
+            let mc = get_dep_component!(@self, Member);
+            let member = mc.members.entry(member_id).member.read();
+            member.verify(caller);
+
+            let role_in_u16 = MemberRoleIntoU16::into(member.role);
+            assert(role_in_u16 >= self.min_role_for_executing.read(), 'Setter not qualified');
+
+            let previous_threshold = self.generic_threshold.read();
+            self.generic_threshold.write(new_threshold);
+            self.emit(
+                ThresholdChanged {
+                    previous_threshold,
+                    new_threshold,
+                    timestamp: get_block_timestamp(),
+                }
+            );
         }
 
         fn get_all_polls(self: @ComponentState<TContractState>) -> Array<Poll> {
@@ -124,6 +211,51 @@ pub mod VotingComponent {
             // assert that the config is of VoteConfig
             // for now
             let _ = 0;
+        }
+
+        fn get_eligible_voters(self: @ComponentState<TContractState>) -> Array<u256> {
+            let mc = get_dep_component!(self, Member);
+            let mut eligible_voters: Array<u256> = array![];
+
+            for i in 0..mc.member_count.read() {
+                let current_member = mc.members.entry(i).member.read();
+                let role_in_u16 = MemberRoleIntoU16::into(current_member.role);
+                if role_in_u16 >= self.min_role_for_voting.read() {
+                    eligible_voters.append(current_member.id)
+                }
+            }
+
+            eligible_voters
+        }
+
+        fn get_eligible_pollers(self: @ComponentState<TContractState>) -> Array<u256> {
+            let mc = get_dep_component!(self, Member);
+            let mut eligible_voters: Array<u256> = array![];
+
+            for i in 0..mc.member_count.read() {
+                let current_member = mc.members.entry(i).member.read();
+                let role_in_u16 = MemberRoleIntoU16::into(current_member.role);
+                if role_in_u16 >= self.min_role_for_polling.read() {
+                    eligible_voters.append(current_member.id)
+                }
+            }
+
+            eligible_voters
+        }
+
+        fn get_eligible_executors(self: @ComponentState<TContractState>) -> Array<u256> {
+            let mc = get_dep_component!(self, Member);
+            let mut eligible_voters: Array<u256> = array![];
+
+            for i in 0..mc.member_count.read() {
+                let current_member = mc.members.entry(i).member.read();
+                let role_in_u16 = MemberRoleIntoU16::into(current_member.role);
+                if role_in_u16 >= self.min_role_for_executing.read() {
+                    eligible_voters.append(current_member.id)
+                }
+            }
+
+            eligible_voters
         }
     }
 

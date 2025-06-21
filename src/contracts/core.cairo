@@ -101,10 +101,11 @@ mod Core {
         first_admin_lname: felt252,
         first_admin_alias: felt252,
         deployer: ContractAddress,
+        organization_type: u8
     ) { // owner
         self
             .organization
-            ._init(Option::Some(owner), org_name, ipfs_url, vault_address, org_id, deployer);
+            ._init(Option::Some(owner), org_name, ipfs_url, vault_address, org_id, deployer, organization_type);
         // MemberManagerComponent::InternalImpl::_initialize(
         //     ref self.member, first_admin_fname, first_admin_lname, first_admin_alias
         // )

@@ -69,26 +69,53 @@ pub struct CHANGEORGANIZATIONTYPE {
 
 #[generate_trait]
 pub impl PollImpl of PollTrait {
-    fn resolve(ref self: Poll) {
+    fn resolve(ref self: Poll) -> bool {
         assert(self.up_votes + self.down_votes >= DEFAULT_THRESHOLD, 'COULD NOT RESOLVE');
         let mut status = false;
         if self.up_votes > self.down_votes {
             status = true;
         }
-        self.status = PollStatus::Finished(status);
+        self.status = PollStatus::FINISHED(status);
+
+        status
     }
 
     fn stop(ref self: Poll) {
-        self.status = PollStatus::Finished(false);
+        self.status = PollStatus::FINISHED(false);
     }
 }
 
 #[derive(Drop, Copy, Default, Serde, PartialEq, starknet::Store)]
 pub enum PollStatus {
+    // Pending,
     #[default]
-    Pending,
-    Started,
-    Finished: bool,
+    ACTIVE,
+    FINISHED: bool,
+}
+
+#[derive(Drop, starknet::Event)]
+pub struct PollCreated {
+    #[key]
+    pub id: u256,
+    #[key]
+    pub proposer: ContractAddress,
+    pub reason: PollReason,
+    pub timestamp: u64
+}
+
+#[derive(Drop, starknet::Event)]
+pub struct PollStopped {
+    #[key]
+    pub id: u256,
+    #[key]
+    pub timestamp: u64,
+}
+
+#[derive(Drop, starknet::Event)]
+pub struct ThresholdChanged {
+    pub previous_threshold: u256,
+    pub new_threshold: u256,
+    pub timestamp: u64
 }
 
 #[derive(Drop, starknet::Event)]
@@ -96,7 +123,8 @@ pub struct Voted {
     #[key]
     pub id: u256,
     #[key]
-    pub voter: ContractAddress,
+    pub voter: ContractAddress, //using member_id
+    pub timestamp: u64,
 }
 
 #[derive(Drop, starknet::Event)]
@@ -104,6 +132,7 @@ pub struct PollResolved {
     #[key]
     pub id: u256,
     pub outcome: bool,
+    pub timestamp: u64,
 }
 
 pub const DEFAULT_THRESHOLD: u256 = 10;
@@ -132,8 +161,8 @@ pub fn default_voting_config_init() -> VotingConfig {
     Default::default()
 }
 
-#[derive(Drop, Copy, Serde, Default, PartialEq)]
-pub struct PollConfigParams {}
+// #[derive(Drop, Copy, Serde, Default, PartialEq)]
+// pub struct PollConfigParams {}
 
-#[starknet::storage_node]
-pub struct PollConfig {}
+// #[starknet::storage_node]
+// pub struct PollConfig {}
