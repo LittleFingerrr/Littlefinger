@@ -5,7 +5,7 @@ mod Core {
     use littlefinger::components::disbursement::DisbursementComponent;
     use littlefinger::components::member_manager::MemberManagerComponent;
     use littlefinger::components::organization::OrganizationComponent;
-    use littlefinger::components::voting::VotingComponent;
+    use littlefinger::components::dao_controller::VotingComponent;
     use littlefinger::interfaces::icore::ICore;
     use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
     use littlefinger::structs::disbursement_structs::{ScheduleStatus, UnitDisbursement};
@@ -16,7 +16,7 @@ mod Core {
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::storage::StoragePointerWriteAccess;
     use starknet::{
-        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
+        ClassHash, ContractAddress, get_block_timestamp, get_caller_address,
     };
     use crate::interfaces::imember_manager::IMemberManager;
 

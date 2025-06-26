@@ -10,14 +10,14 @@ pub mod interfaces {
     pub mod imember_manager;
     pub mod iorganization;
     pub mod ivault;
-    pub mod voting;
+    pub mod dao_controller;
 }
 
 pub mod components {
     pub mod disbursement;
     pub mod member_manager;
     pub mod organization;
-    pub mod voting;
+    pub mod dao_controller;
 }
 
 pub mod structs {
@@ -27,7 +27,7 @@ pub mod structs {
     pub mod member_structs;
     pub mod organization;
     pub mod vault_structs;
-    pub mod voting;
+    pub mod dao_controller;
 }
 
 #[cfg(test)]

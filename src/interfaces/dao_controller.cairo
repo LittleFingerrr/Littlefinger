@@ -1,4 +1,4 @@
-use crate::structs::voting::{Poll, PollReason, VotingConfig};
+use crate::structs::dao_controller::{Poll, PollReason, VotingConfig};
 
 #[starknet::interface]
 pub trait IVote<TContractState> {
