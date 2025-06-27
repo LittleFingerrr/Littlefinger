@@ -6,11 +6,11 @@ pub mod VotingComponent {
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     // use crate::interfaces::icore::IConfig;
     use crate::interfaces::dao_controller::IVote;
-    use crate::structs::member_structs::{MemberRoleIntoU16, MemberTrait};
     use crate::structs::dao_controller::{
         Poll, PollCreated, PollReason, PollResolved, PollStatus, PollStopped, PollTrait,
         ThresholdChanged, Voted, VotingConfig, VotingConfigNode,
     };
+    use crate::structs::member_structs::{MemberRoleIntoU16, MemberTrait};
     use super::super::member_manager::MemberManagerComponent;
 
     #[storage]
