@@ -6,7 +6,7 @@ pub mod Vault {
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
     use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, StoragePointerReadAccess, StoragePointerWriteAccess, StorageMapReadAccess, StorageMapWriteAccess,
     };
     use starknet::{
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
@@ -113,7 +113,7 @@ pub mod Vault {
         self.total_bonus.write(bonus_allocation);
         self.token.write(token);
         // let caller = get_caller_address();
-        self.permitted_addresses.entry(owner).write(true);
+        self.permitted_addresses.write(owner, true);
     }
 
     // TODO:
@@ -128,9 +128,9 @@ pub mod Vault {
     pub impl VaultImpl of IVault<ContractState> {
         fn deposit_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
             let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
+            let permitted = self.permitted_addresses.read(caller);
             assert(permitted, 'Direct Caller not permitted');
-            assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
+            assert(self.permitted_addresses.read(address), 'Deep Caller Not Permitted');
             let current_vault_status = self.vault_status.read();
             assert(
                 current_vault_status != VaultStatus::VAULTFROZEN, 'Vault Frozen for Transactions',
@@ -155,9 +155,9 @@ pub mod Vault {
 
         fn withdraw_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
             let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
+            let permitted = self.permitted_addresses.read(caller);
             assert(permitted, 'Direct Caller not permitted');
-            assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
+            assert(self.permitted_addresses.read(address), 'Deep Caller Not Permitted');
 
             let current_vault_status = self.vault_status.read();
             assert(
@@ -183,9 +183,9 @@ pub mod Vault {
             ref self: ContractState, amount: u256, address: ContractAddress,
         ) {
             let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
+            let permitted = self.permitted_addresses.read(caller);
             assert(permitted, 'Direct Caller not permitted');
-            assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
+            assert(self.permitted_addresses.read(address), 'Deep Caller Not Permitted');
             self.total_bonus.write(self.total_bonus.read() + amount);
             self
                 ._record_transaction(
@@ -195,7 +195,7 @@ pub mod Vault {
 
         fn emergency_freeze(ref self: ContractState) {
             let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
+            let permitted = self.permitted_addresses.read(caller);
             assert(permitted, 'Caller not permitted');
             assert(self.vault_status.read() != VaultStatus::VAULTFROZEN, 'Vault Already Frozen');
 
@@ -204,7 +204,7 @@ pub mod Vault {
 
         fn unfreeze_vault(ref self: ContractState) {
             let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
+            let permitted = self.permitted_addresses.read(caller);
             assert(permitted, 'Caller not permitted');
             assert(self.vault_status.read() != VaultStatus::VAULTRESUMED, 'Vault Not Frozen');
 
@@ -225,7 +225,7 @@ pub mod Vault {
 
         fn pay_member(ref self: ContractState, recipient: ContractAddress, amount: u256) {
             let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
+            assert(self.permitted_addresses.read(caller), 'Caller Not Permitted');
             let token_address = self.token.read();
             let token = IERC20Dispatcher { contract_address: token_address };
             let transfer = token.transfer(recipient, amount);
@@ -243,7 +243,7 @@ pub mod Vault {
             let mut transaction_history = array![];
 
             for i in 1..self.transactions_count.read() + 1 {
-                let current_transaction = self.transaction_history.entry(i).read();
+                let current_transaction = self.transaction_history.read(i);
                 transaction_history.append(current_transaction);
             }
 
@@ -251,7 +251,7 @@ pub mod Vault {
         }
 
         fn allow_org_core_address(ref self: ContractState, org_address: ContractAddress) {
-            self.permitted_addresses.entry(org_address).write(true);
+            self.permitted_addresses.write(org_address, true);
         }
     }
 
@@ -259,9 +259,9 @@ pub mod Vault {
     impl InternalFunctions of InternalTrait {
         fn _add_transaction(ref self: ContractState, transaction: Transaction) {
             let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller not permitted');
+            assert(self.permitted_addresses.read(caller), 'Caller not permitted');
             let current_transaction_count = self.transactions_count.read();
-            self.transaction_history.entry(current_transaction_count + 1).write(transaction);
+            self.transaction_history.write(current_transaction_count + 1, transaction);
             self.transactions_count.write(current_transaction_count + 1);
         }
 
@@ -272,8 +272,8 @@ pub mod Vault {
             transaction_type: TransactionType,
             caller: ContractAddress,
         ) {
-            let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
+            let actual_caller = get_caller_address();
+            assert(self.permitted_addresses.read(actual_caller), 'Caller Not Permitted');
             let timestamp = get_block_timestamp();
             let tx_info = get_tx_info();
             let transaction = Transaction {
@@ -289,7 +289,7 @@ pub mod Vault {
                 .emit(
                     TransactionRecorded {
                         transaction_type,
-                        caller,
+                        caller: actual_caller,
                         transaction_details: transaction,
                         token: token_address,
                     },
