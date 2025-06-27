@@ -4,6 +4,7 @@ use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare,
     start_cheat_caller_address, stop_cheat_caller_address
 };
+#[feature("deprecated-starknet-consts")]
 use starknet::{ContractAddress, contract_address_const};
 
 // Mock ERC20 token for testing

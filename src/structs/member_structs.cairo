@@ -1,6 +1,6 @@
 use starknet::ContractAddress;
 use starknet::storage::{
-    Mutable, StoragePath, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+    StoragePath, StoragePointerReadAccess,
 };
 use super::base::ContractAddressDefault;
 

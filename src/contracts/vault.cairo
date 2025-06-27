@@ -127,8 +127,8 @@ pub mod Vault {
     #[abi(embed_v0)]
     pub impl VaultImpl of IVault<ContractState> {
         fn deposit_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.read(caller);
+            let _caller = get_caller_address();
+            let permitted = self.permitted_addresses.read(_caller);
             assert(permitted, 'Direct Caller not permitted');
             assert(self.permitted_addresses.read(address), 'Deep Caller Not Permitted');
             let current_vault_status = self.vault_status.read();
@@ -154,8 +154,8 @@ pub mod Vault {
         }
 
         fn withdraw_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.read(caller);
+            let _caller = get_caller_address();
+            let permitted = self.permitted_addresses.read(_caller);
             assert(permitted, 'Direct Caller not permitted');
             assert(self.permitted_addresses.read(address), 'Deep Caller Not Permitted');
 
@@ -182,8 +182,8 @@ pub mod Vault {
         fn add_to_bonus_allocation(
             ref self: ContractState, amount: u256, address: ContractAddress,
         ) {
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.read(caller);
+            let _caller = get_caller_address();
+            let permitted = self.permitted_addresses.read(_caller);
             assert(permitted, 'Direct Caller not permitted');
             assert(self.permitted_addresses.read(address), 'Deep Caller Not Permitted');
             self.total_bonus.write(self.total_bonus.read() + amount);
@@ -194,8 +194,8 @@ pub mod Vault {
         }
 
         fn emergency_freeze(ref self: ContractState) {
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.read(caller);
+            let _caller = get_caller_address();
+            let permitted = self.permitted_addresses.read(_caller);
             assert(permitted, 'Caller not permitted');
             assert(self.vault_status.read() != VaultStatus::VAULTFROZEN, 'Vault Already Frozen');
 
@@ -203,8 +203,8 @@ pub mod Vault {
         }
 
         fn unfreeze_vault(ref self: ContractState) {
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.read(caller);
+            let _caller = get_caller_address();
+            let permitted = self.permitted_addresses.read(_caller);
             assert(permitted, 'Caller not permitted');
             assert(self.vault_status.read() != VaultStatus::VAULTRESUMED, 'Vault Not Frozen');
 
@@ -258,8 +258,8 @@ pub mod Vault {
     #[generate_trait]
     impl InternalFunctions of InternalTrait {
         fn _add_transaction(ref self: ContractState, transaction: Transaction) {
-            let caller = get_caller_address();
-            assert(self.permitted_addresses.read(caller), 'Caller not permitted');
+            let _caller = get_caller_address();
+            assert(self.permitted_addresses.read(_caller), 'Caller not permitted');
             let current_transaction_count = self.transactions_count.read();
             self.transaction_history.write(current_transaction_count + 1, transaction);
             self.transactions_count.write(current_transaction_count + 1);
