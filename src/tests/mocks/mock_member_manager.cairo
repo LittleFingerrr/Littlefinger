@@ -2,9 +2,7 @@
 pub mod MockMemberManager {
     use littlefinger::components::member_manager::MemberManagerComponent;
     use starknet::ContractAddress;
-    use starknet::storage::{
-        MutableVecTrait,
-    };
+    use starknet::storage::MutableVecTrait;
 
     component!(path: MemberManagerComponent, storage: member_manager, event: MemberManagerEvent);
 

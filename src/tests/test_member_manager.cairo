@@ -1,15 +1,12 @@
 use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
-use littlefinger::structs::member_structs::{
-    MemberRole, MemberRoleIntoU16, MemberStatus,
-};
+use littlefinger::structs::member_structs::{MemberRole, MemberRoleIntoU16, MemberStatus};
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
     start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
 };
-
 #[feature("deprecated-starknet-consts")]
 use starknet::{ContractAddress, contract_address_const};
 
