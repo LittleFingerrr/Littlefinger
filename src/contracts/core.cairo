@@ -151,7 +151,7 @@ mod Core {
         }
 
         fn schedule_payout(ref self: ContractState) {
-            let _caller = get_caller_address();
+            let caller = get_caller_address();
             let members = self.member.get_members();
             let no_of_members = members.len();
 
@@ -160,7 +160,7 @@ mod Core {
 
             let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
             let total_bonus = vault_dispatcher.get_bonus_allocation();
-            let _total_funds = vault_dispatcher.get_balance();
+            let total_funds = vault_dispatcher.get_balance();
 
             let current_schedule = self.disbursement.get_current_schedule();
             assert(current_schedule.status == ScheduleStatus::ACTIVE, 'Schedule not active');
@@ -203,7 +203,7 @@ mod Core {
                 let amount = self
                     .disbursement
                     .compute_renumeration(current_member_response, total_bonus, total_weight);
-                let _timestamp = get_block_timestamp();
+                let timestamp = get_block_timestamp();
                 vault_dispatcher.pay_member(current_member_response.address, amount);
 
                 // let unit_disbursement = UnitDisbursement {
