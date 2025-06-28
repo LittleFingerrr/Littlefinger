@@ -6,7 +6,7 @@ pub mod Vault {
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
     use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry,
     };
     use starknet::{
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
@@ -18,10 +18,10 @@ pub mod Vault {
 
     #[storage]
     struct Storage {
-        permitted_addresses: Map<ContractAddress, bool>,
+        permitted_addresses: Map::<ContractAddress, bool>,
         available_funds: u256,
         total_bonus: u256,
-        transaction_history: Map<
+        transaction_history: Map::<
             u64, Transaction,
         >, // No 1. Transaction x, no 2, transaction y etc for history, and it begins with 1
         transactions_count: u64,
@@ -272,8 +272,8 @@ pub mod Vault {
             transaction_type: TransactionType,
             caller: ContractAddress,
         ) {
-            let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
+            let actual_caller = get_caller_address();
+            assert(self.permitted_addresses.entry(actual_caller).read(), 'Caller Not Permitted');
             let timestamp = get_block_timestamp();
             let tx_info = get_tx_info();
             let transaction = Transaction {
@@ -289,7 +289,7 @@ pub mod Vault {
                 .emit(
                     TransactionRecorded {
                         transaction_type,
-                        caller,
+                        caller: actual_caller,
                         transaction_details: transaction,
                         token: token_address,
                     },

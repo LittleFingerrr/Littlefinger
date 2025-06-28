@@ -1,4 +1,4 @@
-use littlefinger::structs::member_structs::{MemberConfig, MemberResponse, MemberRole};
+use littlefinger::structs::member_structs::{MemberConfig, MemberResponse};
 use starknet::ContractAddress;
 
 #[starknet::interface]

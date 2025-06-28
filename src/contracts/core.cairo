@@ -8,9 +8,9 @@ mod Core {
     use littlefinger::components::organization::OrganizationComponent;
     use littlefinger::interfaces::icore::ICore;
     use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
-    use littlefinger::structs::disbursement_structs::{ScheduleStatus, UnitDisbursement};
+    use littlefinger::structs::disbursement_structs::ScheduleStatus;
     // use littlefinger::structs::organization::{OrganizationConfig, OrganizationInfo, OwnerInit};
-    use littlefinger::structs::member_structs::{Member, MemberResponse, MemberRoleIntoU16};
+    use littlefinger::structs::member_structs::MemberRoleIntoU16;
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;

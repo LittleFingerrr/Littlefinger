@@ -1,16 +1,13 @@
 use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
-use littlefinger::structs::member_structs::{
-    InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails, MemberEnum, MemberEvent,
-    MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole, MemberRoleIntoU16,
-    MemberStatus, MemberTrait,
-};
+use littlefinger::structs::member_structs::{MemberRole, MemberRoleIntoU16, MemberStatus};
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
     start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
 };
+#[feature("deprecated-starknet-consts")]
 use starknet::{ContractAddress, contract_address_const};
 
 fn deploy_mock_contract() -> IMemberManagerDispatcher {
@@ -118,7 +115,7 @@ fn test_add_admin_not_admin() {
 
     start_cheat_caller_address(mock_contract.contract_address, caller);
     mock_contract.add_member(fname, lname, alias, role, member);
-    let mut member_response = mock_contract.get_member(1);
+    let mut _member_response = mock_contract.get_member(1);
     mock_contract.add_admin(1);
     stop_cheat_caller_address(mock_contract.contract_address);
 }

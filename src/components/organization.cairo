@@ -1,8 +1,6 @@
 #[starknet::component]
 pub mod OrganizationComponent {
-    use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-    };
+    use starknet::storage::{Map, StoragePointerReadAccess, StoragePointerWriteAccess};
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     // use crate::interfaces::icore::IConfig;
     use crate::interfaces::iorganization::IOrganization;

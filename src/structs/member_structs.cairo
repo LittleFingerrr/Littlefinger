@@ -1,7 +1,5 @@
 use starknet::ContractAddress;
-use starknet::storage::{
-    Mutable, StoragePath, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-};
+use starknet::storage::{StoragePath, StoragePointerReadAccess};
 use super::base::ContractAddressDefault;
 
 #[derive(Copy, Drop, Serde, Default, PartialEq, starknet::Store)]

@@ -9,8 +9,7 @@ pub mod MemberManagerComponent {
         MemberTrait,
     };
     use starknet::storage::{
-        Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-        Vec, VecTrait,
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
 
