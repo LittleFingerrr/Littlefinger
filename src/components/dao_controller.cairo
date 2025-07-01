@@ -247,7 +247,7 @@ pub mod VotingComponent {
 
     #[generate_trait]
     pub impl VoteInternalImpl<
-        TContractState, +HasComponent<ComponentState<TContractState>>,
+        TContractState, +HasComponent<TContractState>,
     > of VoteTrait<TContractState> {
         fn _initialize(
             ref self: ComponentState<TContractState>,

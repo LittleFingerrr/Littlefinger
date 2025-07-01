@@ -140,10 +140,10 @@ pub type Power = u16;
 
 #[derive(Drop, Serde, Copy, Default)]
 pub struct VotingConfig {
-    private: bool,
-    threshold: u256,
-    weighted: bool,
-    weighted_with: ContractAddress // weight with this token, else, use rank.
+    pub private: bool,
+    pub threshold: u256,
+    pub weighted: bool,
+    pub weighted_with: ContractAddress // weight with this token, else, use rank.
 }
 
 // For the default
