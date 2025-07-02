@@ -6,7 +6,7 @@ pub mod Vault {
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
     use starknet::storage::{
-        Map, StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry,
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use starknet::{
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
@@ -18,10 +18,10 @@ pub mod Vault {
 
     #[storage]
     struct Storage {
-        permitted_addresses: Map::<ContractAddress, bool>,
+        permitted_addresses: Map<ContractAddress, bool>,
         available_funds: u256,
         total_bonus: u256,
-        transaction_history: Map::<
+        transaction_history: Map<
             u64, Transaction,
         >, // No 1. Transaction x, no 2, transaction y etc for history, and it begins with 1
         transactions_count: u64,
