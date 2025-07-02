@@ -3,10 +3,12 @@ use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
 use littlefinger::structs::dao_controller::{
-    Poll, PollCreated, PollReason, PollResolved, PollStatus, PollStopped, PollTrait,
-    ThresholdChanged, Voted, VotingConfig, VotingConfigNode, ADDMEMBER,
+    ADDMEMBER, Poll, PollCreated, PollReason, PollResolved, PollStatus, PollStopped, PollTrait,
+    ThresholdChanged, Voted, VotingConfig, VotingConfigNode,
 };
-use littlefinger::structs::member_structs::{MemberInvite, MemberRoleIntoU16, MemberRole, InviteStatus};
+use littlefinger::structs::member_structs::{
+    InviteStatus, MemberInvite, MemberRole, MemberRoleIntoU16,
+};
 use littlefinger::tests::mocks::mock_dao_controller::MockDaoController;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
@@ -85,7 +87,6 @@ fn test_poll_creation_success() {
         base_pay: 5_u256,
         invite_status: InviteStatus::PENDING,
         expiry: 2000,
-
     };
     let add_member_data = ADDMEMBER { member: member_invite_instance, member_address: member1() };
 
@@ -119,16 +120,15 @@ fn test_poll_creation_fail_verification() {
         base_pay: 5_u256,
         invite_status: InviteStatus::PENDING,
         expiry: 2000,
-
     };
     let add_member_data = ADDMEMBER { member: member_invite_instance, member_address: member4() };
 
     start_cheat_caller_address(voting.contract_address, unauthorized_caller());
     start_cheat_block_timestamp(voting.contract_address, 1000);
-    
+
     let member1_id = 2;
     let reason = PollReason::ADDMEMBER(add_member_data);
-    
+
     voting.create_poll(member1_id, reason);
 }
 
