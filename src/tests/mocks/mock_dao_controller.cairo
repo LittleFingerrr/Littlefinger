@@ -24,6 +24,7 @@ pub mod MockDaoController {
 
 
     pub impl InternalImpl = VotingComponent::VoteInternalImpl<ContractState>;
+    pub impl MemberInternalImpl = MemberManagerComponent::InternalImpl<ContractState>;
 
     #[storage]
     pub struct Storage {
@@ -44,8 +45,29 @@ pub mod MockDaoController {
 
     #[constructor]
     fn constructor(
-        ref self: ContractState, admin: ContractAddress, config: VotingConfig, threshold: u256,
+        ref self: ContractState,
+        admin: ContractAddress,
+        config: VotingConfig,
+        threshold: u256,
+        first_admin_fname: felt252,
+        first_admin_lname: felt252,
+        first_admin_alias: felt252,
+        member1: ContractAddress,
+        member2: ContractAddress,
+        member3: ContractAddress,
     ) {
         self.dao_controller._initialize(admin, config, threshold);
+        self
+            .member_manager
+            ._initialize(first_admin_fname, first_admin_lname, first_admin_alias, admin);
+        self
+            .member_manager
+            .add_member('Member1'.into(), 'LastName1'.into(), 'Alias1'.into(), 5, member1);
+        self
+            .member_manager
+            .add_member('Member2'.into(), 'LastName2'.into(), 'Alias2'.into(), 0, member2);
+        self
+            .member_manager
+            .add_member('Member3'.into(), 'LastName3'.into(), 'Alias3'.into(), 5, member3);
     }
 }
