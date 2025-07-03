@@ -250,7 +250,7 @@ fn test_poll_rejection_success() {
 
 #[test]
 #[should_panic(expected: 'CALLER HAS VOTED')]
-fn test_poll_rejection_fail_double_vote(){
+fn test_poll_rejection_fail_double_vote() {
     let voting = deploy_mock_voting_contract();
     start_cheat_caller_address(voting.contract_address, member1());
     start_cheat_block_timestamp(voting.contract_address, 1000);
@@ -412,10 +412,7 @@ fn test_update_voting_config_does_not_panic() {
     start_cheat_caller_address(voting.contract_address, member1());
 
     let config = VotingConfig {
-        private: false,
-        threshold: 123,
-        weighted: false,
-        weighted_with: member1(),
+        private: false, threshold: 123, weighted: false, weighted_with: member1(),
     };
     voting.update_voting_config(config);
 
