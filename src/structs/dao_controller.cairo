@@ -69,8 +69,8 @@ pub struct CHANGEORGANIZATIONTYPE {
 
 #[generate_trait]
 pub impl PollImpl of PollTrait {
-    fn resolve(ref self: Poll) -> bool {
-        assert(self.up_votes + self.down_votes >= DEFAULT_THRESHOLD, 'COULD NOT RESOLVE');
+    fn resolve(ref self: Poll, threshold: u256) -> bool {
+        assert(self.up_votes + self.down_votes >= threshold, 'COULD NOT RESOLVE');
         let mut status = false;
         if self.up_votes > self.down_votes {
             status = true;

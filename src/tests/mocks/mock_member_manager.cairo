@@ -1,10 +1,3 @@
-use littlefinger::interfaces::imember_manager::IMemberManager as IMockMemberManager;
-use littlefinger::structs::member_structs::{
-    InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails, MemberEnum, MemberEvent,
-    MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole, MemberStatus, MemberTrait,
-};
-use starknet::ContractAddress;
-
 #[starknet::contract]
 pub mod MockMemberManager {
     use littlefinger::components::member_manager::MemberManagerComponent;

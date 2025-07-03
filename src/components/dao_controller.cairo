@@ -106,7 +106,7 @@ pub mod VotingComponent {
             // this until the permission control component is added to the codebase
 
             if poll.up_votes >= threshold {
-                let outcome = poll.resolve();
+                let outcome = poll.resolve(threshold);
                 self.emit(PollResolved { id: poll_id, outcome, timestamp })
             }
             self.has_voted.entry((caller, poll_id)).write(true);
@@ -140,7 +140,7 @@ pub mod VotingComponent {
             let max_no_of_possible_approvals = max_possible_of_voters - poll.down_votes;
 
             if max_no_of_possible_approvals < threshold {
-                let outcome = poll.resolve();
+                let outcome = poll.resolve(threshold);
                 self.emit(PollResolved { id: poll_id, outcome, timestamp })
             }
 
