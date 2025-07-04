@@ -272,8 +272,8 @@ pub mod Vault {
             transaction_type: TransactionType,
             caller: ContractAddress,
         ) {
-            let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
+            let actual_caller = get_caller_address();
+            assert(self.permitted_addresses.entry(actual_caller).read(), 'Caller Not Permitted');
             let timestamp = get_block_timestamp();
             let tx_info = get_tx_info();
             let transaction = Transaction {
@@ -289,7 +289,7 @@ pub mod Vault {
                 .emit(
                     TransactionRecorded {
                         transaction_type,
-                        caller,
+                        caller: actual_caller,
                         transaction_details: transaction,
                         token: token_address,
                     },

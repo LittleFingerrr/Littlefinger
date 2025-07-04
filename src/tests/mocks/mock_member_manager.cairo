@@ -1,12 +1,8 @@
 #[starknet::contract]
 pub mod MockMemberManager {
     use littlefinger::components::member_manager::MemberManagerComponent;
-    use littlefinger::structs::member_structs::{MemberConfig, MemberResponse, MemberRole};
     use starknet::ContractAddress;
-    use starknet::storage::{
-        Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
-        Vec, VecTrait,
-    };
+    use starknet::storage::MutableVecTrait;
 
     component!(path: MemberManagerComponent, storage: member_manager, event: MemberManagerEvent);
 
@@ -41,9 +37,12 @@ pub mod MockMemberManager {
             .member_manager
             ._initialize(first_admin_fname, first_admin_lname, first_admin_alias, admin);
 
-        // Initialize role values if needed
-        self.member_manager.role_value.append().write(1);
-        self.member_manager.role_value.append().write(2);
-        self.member_manager.role_value.append().write(3);
+        // Initialize role values if needed - using modern storage syntax
+        #[feature("starknet-storage-deprecation")]
+        {
+            self.member_manager.role_value.push(1);
+            self.member_manager.role_value.push(2);
+            self.member_manager.role_value.push(3);
+        }
     }
 }
