@@ -9,6 +9,13 @@ pub mod DisbursementComponent {
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
+    use super::super::organization;
+    use super::super::dao_controller;
+    use super::super::organization::OrganizationComponent::{OrganizationManager, Organization};
+    use super::super::dao_controller::VotingComponent::{VotingImpl, Voting, VotingTrait};
+    use crate::structs::organization::OrganizationType;
+    use crate::structs::dao_controller::{PollReason, CHANGESCHEDULESTATUS, SETCURRENTDISBURSEMENTSCHEDULE};
+
 
     #[storage]
     pub struct Storage {
@@ -24,8 +31,10 @@ pub mod DisbursementComponent {
 
     #[embeddable_as(DisbursementManager)]
     pub impl DisbursementImpl<
-        TContractState, +HasComponent<TContractState> //, +Drop<TContractState>,
+        TContractState, +HasComponent<TContractState>,//, +Drop<TContractState>,
         //impl Member: MemberManagerComponent::HasComponent<TContractState>,
+        impl Organization: OrganizationManager::HasComponent<TContractState>,
+        impl Voting: dao_controller::VotingComponent::HasComponent<TContractState>,
     > of IDisbursement<ComponentState<TContractState>> {
         fn create_disbursement_schedule(
             ref self: ComponentState<TContractState>,
@@ -33,57 +42,141 @@ pub mod DisbursementComponent {
             start: u64, //timestamp
             end: u64,
             interval: u64,
+            member_id: u256, // member id for proposal
         ) {
-            self._assert_caller();
-            let schedule_count = self.schedules_count.read();
-            let schedule_id = schedule_count + 1;
-            let mut processed_schedule_type = ScheduleType::ONETIME;
-            if schedule_type == 0 {
-                processed_schedule_type = ScheduleType::RECURRING;
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    // Execute directly
+                    self._assert_caller();
+                    let schedule_count = self.schedules_count.read();
+                    let schedule_id = schedule_count + 1;
+                    let mut processed_schedule_type = ScheduleType::ONETIME;
+                    if schedule_type == 0 {
+                        processed_schedule_type = ScheduleType::RECURRING;
+                    }
+                    let disbursement_schedule = DisbursementSchedule {
+                        schedule_id,
+                        status: ScheduleStatus::ACTIVE,
+                        schedule_type: processed_schedule_type,
+                        start_timestamp: start,
+                        end_timestamp: end,
+                        interval,
+                        last_execution: Option::None,
+                    };
+                    self.schedules_count.write(schedule_count + 1);
+                    self.disbursement_schedules.entry(schedule_count + 1).write(disbursement_schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    // Create a proposal for setting the schedule
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let previous_schedule = self.current_schedule.read();
+                    let new_schedule = DisbursementSchedule {
+                        schedule_id: self.schedules_count.read() + 1,
+                        status: ScheduleStatus::ACTIVE,
+                        schedule_type: if schedule_type == 0 { ScheduleType::RECURRING } else { ScheduleType::ONETIME },
+                        start_timestamp: start,
+                        end_timestamp: end,
+                        interval,
+                        last_execution: Option::None,
+                    };
+                    let reason = PollReason::SETCURRENTDISBURSEMENTSCHEDULE(
+                        SETCURRENTDISBURSEMENTSCHEDULE {
+                            schedule_id: new_schedule.schedule_id,
+                            previous_schedule,
+                            new_schedule,
+                        }
+                    );
+                    let poll_id = voting_mut.create_poll(member_id, reason);
+                },
             }
-            let disbursement_schedule = DisbursementSchedule {
-                schedule_id,
-                status: ScheduleStatus::ACTIVE,
-                schedule_type: processed_schedule_type,
-                start_timestamp: start,
-                end_timestamp: end,
-                interval,
-                last_execution: Option::None,
-            };
-            self.schedules_count.write(schedule_count + 1);
-            self.disbursement_schedules.entry(schedule_count + 1).write(disbursement_schedule);
         }
 
-        fn pause_disbursement_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(
-                disbursement_schedule.status == ScheduleStatus::ACTIVE,
-                'Schedule Paused or Deleted',
-            );
-            disbursement_schedule.status = ScheduleStatus::PAUSED;
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+        fn pause_disbursement_schedule(ref self: ComponentState<TContractState>, schedule_id: u64, member_id: u256) {
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    self._assert_caller();
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    assert(
+                        disbursement_schedule.status == ScheduleStatus::ACTIVE,
+                        'Schedule Paused or Deleted',
+                    );
+                    disbursement_schedule.status = ScheduleStatus::PAUSED;
+                    self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    let reason = PollReason::CHANGESCHEDULESTATUS(
+                        CHANGESCHEDULESTATUS {
+                            schedule_id,
+                            previous_status: disbursement_schedule.status,
+                            new_status: ScheduleStatus::PAUSED,
+                        }
+                    );
+                    let poll_id = voting_mut.create_poll(member_id, reason);
+                },
+            }
         }
 
-        fn resume_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(
-                disbursement_schedule.status == ScheduleStatus::PAUSED,
-                'Schedule Active or Deleted',
-            );
-            disbursement_schedule.status = ScheduleStatus::ACTIVE;
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+        fn resume_schedule(ref self: ComponentState<TContractState>, schedule_id: u64, member_id: u256) {
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    self._assert_caller();
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    assert(
+                        disbursement_schedule.status == ScheduleStatus::PAUSED,
+                        'Schedule Active or Deleted',
+                    );
+                    disbursement_schedule.status = ScheduleStatus::ACTIVE;
+                    self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    let reason = PollReason::CHANGESCHEDULESTATUS(
+                        CHANGESCHEDULESTATUS {
+                            schedule_id,
+                            previous_status: disbursement_schedule.status,
+                            new_status: ScheduleStatus::ACTIVE,
+                        }
+                    );
+                    let poll_id = voting_mut.create_poll(member_id, reason);
+                },
+            }
         }
 
-        fn delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(
-                disbursement_schedule.status != ScheduleStatus::DELETED, 'Scedule Already Deleted',
-            );
-            disbursement_schedule.status = ScheduleStatus::DELETED;
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+        fn delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64, member_id: u256) {
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    self._assert_caller();
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    assert(
+                        disbursement_schedule.status != ScheduleStatus::DELETED, 'Scedule Already Deleted',
+                    );
+                    disbursement_schedule.status = ScheduleStatus::DELETED;
+                    self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    let reason = PollReason::CHANGESCHEDULESTATUS(
+                        CHANGESCHEDULESTATUS {
+                            schedule_id,
+                            previous_status: disbursement_schedule.status,
+                            new_status: ScheduleStatus::DELETED,
+                        }
+                    );
+                    let poll_id = voting_mut.create_poll(member_id, reason);
+                },
+            }
         }
 
         fn add_failed_disbursement(
@@ -107,11 +200,30 @@ pub mod DisbursementComponent {
             self.current_schedule.write(current_schedule);
         }
 
-        fn set_current_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
-            self._assert_caller();
-            let schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(schedule.status == ScheduleStatus::ACTIVE, 'Schedule Not Active');
-            self.current_schedule.write(schedule);
+        fn set_current_schedule(ref self: ComponentState<TContractState>, schedule_id: u64, member_id: u256) {
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    self._assert_caller();
+                    let schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    assert(schedule.status == ScheduleStatus::ACTIVE, 'Schedule Not Active');
+                    self.current_schedule.write(schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let previous_schedule = self.current_schedule.read();
+                    let new_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    let reason = PollReason::SETCURRENTDISBURSEMENTSCHEDULE(
+                        SETCURRENTDISBURSEMENTSCHEDULE {
+                            schedule_id,
+                            previous_schedule,
+                            new_schedule,
+                        }
+                    );
+                    let poll_id = voting_mut.create_poll(member_id, reason);
+                },
+            }
         }
 
         fn get_current_schedule(self: @ComponentState<TContractState>) -> DisbursementSchedule {
@@ -149,29 +261,64 @@ pub mod DisbursementComponent {
         }
 
         fn update_schedule_interval(
-            ref self: ComponentState<TContractState>, schedule_id: u64, new_interval: u64,
+            ref self: ComponentState<TContractState>, schedule_id: u64, new_interval: u64, member_id: u256,
         ) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(disbursement_schedule.status != ScheduleStatus::DELETED, 'Schedule Deleted');
-
-            disbursement_schedule.interval = new_interval;
-
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    self._assert_caller();
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    assert(disbursement_schedule.status != ScheduleStatus::DELETED, 'Schedule Deleted');
+                    
+                    disbursement_schedule.interval = new_interval;
+                    
+                    self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    let reason = PollReason::CHANGESCHEDULESTATUS(
+                        CHANGESCHEDULESTATUS {
+                            schedule_id,
+                            previous_status: disbursement_schedule.status,
+                            new_status: disbursement_schedule.status, // interval change, status unchanged
+                        }
+                    );
+                    let poll_id = voting_mut.create_poll(member_id, reason);
+                },
+            }
         }
 
         fn update_schedule_type(
-            ref self: ComponentState<TContractState>, schedule_id: u64, schedule_type: ScheduleType,
+            ref self: ComponentState<TContractState>, schedule_id: u64, schedule_type: ScheduleType, member_id: u256,
         ) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(disbursement_schedule.status != ScheduleStatus::DELETED, 'Schedule Deleted');
+            let org = get_dep_component!(@self, Organization);
+            let org_info = org.get_organization_details();
+            match org_info.organization_type {
+                OrganizationType::CENTRALIZED => {
+                    self._assert_caller();
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    assert(disbursement_schedule.status != ScheduleStatus::DELETED, 'Schedule Deleted');
 
-            disbursement_schedule.schedule_type = schedule_type;
+                    disbursement_schedule.schedule_type = schedule_type;
 
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+                    self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+                },
+                OrganizationType::DECENTRALIZED => {
+                    let mut voting_mut = get_dep_component_mut!(ref self, Voting);
+                    let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+                    let reason = PollReason::CHANGESCHEDULESTATUS(
+                        CHANGESCHEDULESTATUS {
+                            schedule_id,
+                            previous_status: disbursement_schedule.status,
+                            new_status: disbursement_schedule.status, // type change, status unchanged
+                        }
+                    );
+                    let mut poll_id = voting_mut.create_poll(member_id, reason);
+                },
+            }
         }
-
 
         fn retry_failed_disbursement(ref self: ComponentState<TContractState>, schedule_id: u64) {
             self._assert_caller();
