@@ -1,6 +1,5 @@
 use littlefinger::structs::disbursement_structs::{DisbursementSchedule, ScheduleType};
-use littlefinger::structs::member_structs::{Member, MemberResponse};
-use starknet::ContractAddress;
+use littlefinger::structs::member_structs::{MemberResponse};
 
 // TODO: The component should store failed disbursements, and everytime it disburses, after writing
 // to the storage make it retry
@@ -15,17 +14,17 @@ pub trait IDisbursement<T> {
         end: u64,
         interval: u64,
     );
-    fn pause_disbursement_schedule(ref self: T, schedule_id: u64);
-    fn resume_schedule(ref self: T, schedule_id: u64);
-    fn delete_schedule(ref self: T, schedule_id: u64);
+    fn pause_disbursement(ref self: T,);
+    fn resume_schedule(ref self: T,);
+    fn delete_schedule(ref self: T,);
     fn get_current_schedule(self: @T) -> DisbursementSchedule;
     fn get_disbursement_schedules(self: @T) -> Array<DisbursementSchedule>;
 
-    fn retry_failed_disbursement(ref self: T, schedule_id: u64);
-    fn get_pending_failed_disbursements(self: @T);
-    fn add_failed_disbursement(
-        ref self: T, member: Member, disbursement_id: u256, timestamp: u64, caller: ContractAddress,
-    ) -> bool;
+    // fn retry_failed_disbursement(ref self: T, schedule_id: u64);
+    // fn get_pending_failed_disbursements(self: @T);
+    // fn add_failed_disbursement(
+    //     ref self: T, member: Member, disbursement_id: u256, timestamp: u64, caller: ContractAddress,
+    // ) -> bool;
     fn update_current_schedule_last_execution(ref self: T, timestamp: u64);
     fn set_current_schedule(ref self: T, schedule_id: u64);
 

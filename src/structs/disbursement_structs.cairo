@@ -1,10 +1,9 @@
 use littlefinger::structs::member_structs::Member;
 use starknet::ContractAddress;
 
-#[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store)]
+#[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store, Default)]
 pub struct DisbursementSchedule {
     pub schedule_id: u64,
-    // is_active: bool,
     pub status: ScheduleStatus,
     pub schedule_type: ScheduleType,
     pub start_timestamp: u64,
@@ -36,7 +35,7 @@ pub enum DisbursementStatus {
     FAILED,
 }
 
-#[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store)]
+#[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store, Default)]
 pub enum ScheduleType {
     RECURRING, //1
     #[default]
@@ -47,7 +46,7 @@ pub enum ScheduleType {
 // CONDITIONAL,
 }
 
-#[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store)]
+#[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store, Default)]
 pub enum ScheduleStatus {
     #[default]
     ACTIVE,
