@@ -16,7 +16,7 @@ pub trait IDisbursement<T> {
     );
     fn pause_disbursement(ref self: T,);
     fn resume_schedule(ref self: T,);
-    fn delete_schedule(ref self: T,);
+    // fn delete_schedule(ref self: T,);
     fn get_current_schedule(self: @T) -> DisbursementSchedule;
     fn get_disbursement_schedules(self: @T) -> Array<DisbursementSchedule>;
 

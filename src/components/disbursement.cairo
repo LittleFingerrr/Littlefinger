@@ -51,6 +51,7 @@ pub mod DisbursementComponent {
                 interval,
                 last_execution: Option::None,
             };
+            self._delete_schedule(schedule_count);
             self.previous_schedules.entry(schedule_count).write(current_schedule);
             self.schedules_count.write(schedule_count + 1);
             self.current_schedule.write(new_disbursement_schedule);
@@ -75,16 +76,6 @@ pub mod DisbursementComponent {
                 'Schedule Active or Deleted',
             );
             disbursement_schedule.status = ScheduleStatus::ACTIVE;
-            self.current_schedule.write(disbursement_schedule);
-        }
-
-        fn delete_schedule(ref self: ComponentState<TContractState>,) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.current_schedule.read();
-            assert(
-                disbursement_schedule.status != ScheduleStatus::DELETED, 'Scedule Already Deleted',
-            );
-            disbursement_schedule.status = ScheduleStatus::DELETED;
             self.current_schedule.write(disbursement_schedule);
         }
 
@@ -129,7 +120,7 @@ pub mod DisbursementComponent {
 
             for i in 1..(self.schedules_count.read() + 1) {
                 let current_schedule = self.previous_schedules.entry(i).read();
-                if current_schedule.schedule_id != 0 { // Add validation
+                if current_schedule.schedule_id != 0 && current_schedule.status != ScheduleStatus::DELETED { // Add validation
                     disbursement_schedules_array.append(current_schedule);
                 }
             }
@@ -211,6 +202,16 @@ pub mod DisbursementComponent {
         fn _assert_caller(ref self: ComponentState<TContractState>) {
             let caller = get_caller_address();
             assert(self.authorized_callers.entry(caller).read(), 'Caller Not Permitted');
+        }
+
+        fn _delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
+            self._assert_caller();
+            let mut disbursement_schedule = self.current_schedule.read();
+            assert(
+                disbursement_schedule.status != ScheduleStatus::DELETED, 'Scedule Already Deleted',
+            );
+            disbursement_schedule.status = ScheduleStatus::DELETED;
+            self.current_schedule.write(disbursement_schedule);
         }
 
         fn _initialize(
