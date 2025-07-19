@@ -105,12 +105,14 @@ pub mod Vault {
     fn constructor(
         ref self: ContractState,
         token: ContractAddress,
-        available_funds: u256,
-        bonus_allocation: u256,
+        // available_funds: u256,
+        // bonus_allocation: u256,
         owner: ContractAddress,
     ) {
+        let token_dispatcher = IERC20Dispatcher { contract_address: token };
+        let available_funds = token_dispatcher.balance_of(get_contract_address());
         self.available_funds.write(available_funds);
-        self.total_bonus.write(bonus_allocation);
+        self.total_bonus.write(0);
         self.token.write(token);
         // let caller = get_caller_address();
         self.permitted_addresses.entry(owner).write(true);

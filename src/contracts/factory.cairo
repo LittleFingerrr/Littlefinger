@@ -189,8 +189,8 @@ pub mod Factory {
             let vault_id: u256 = vault_count.try_into().unwrap();
             let mut constructor_calldata = array![];
             token.serialize(ref constructor_calldata);
-            available_funds.serialize(ref constructor_calldata);
-            starting_bonus_allocation.serialize(ref constructor_calldata);
+            // available_funds.serialize(ref constructor_calldata);
+            // starting_bonus_allocation.serialize(ref constructor_calldata);
             owner.serialize(ref constructor_calldata);
 
             // Deploy the Vault
