@@ -4,7 +4,7 @@ pub mod DisbursementComponent {
     use littlefinger::structs::disbursement_structs::{
         DisbursementSchedule, ScheduleStatus, ScheduleType, UnitDisbursement,
     };
-    use littlefinger::structs::member_structs::{Member, MemberResponse};
+    use littlefinger::structs::member_structs::MemberResponse;
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
@@ -14,7 +14,7 @@ pub mod DisbursementComponent {
     pub struct Storage {
         authorized_callers: Map<ContractAddress, bool>,
         owner: ContractAddress,
-        disbursement_schedules: Map<u64, DisbursementSchedule>,
+        previous_schedules: Map<u64, DisbursementSchedule>, // only one active schedule at a time
         current_schedule: DisbursementSchedule,
         failed_disbursements: Map<
             u256, UnitDisbursement,
@@ -36,12 +36,13 @@ pub mod DisbursementComponent {
         ) {
             self._assert_caller();
             let schedule_count = self.schedules_count.read();
+            let current_schedule = self.previous_schedules.entry(schedule_count).read();
             let schedule_id = schedule_count + 1;
             let mut processed_schedule_type = ScheduleType::ONETIME;
             if schedule_type == 0 {
                 processed_schedule_type = ScheduleType::RECURRING;
             }
-            let disbursement_schedule = DisbursementSchedule {
+            let new_disbursement_schedule = DisbursementSchedule {
                 schedule_id,
                 status: ScheduleStatus::ACTIVE,
                 schedule_type: processed_schedule_type,
@@ -50,53 +51,45 @@ pub mod DisbursementComponent {
                 interval,
                 last_execution: Option::None,
             };
+            self._delete_schedule(schedule_count);
+            self.previous_schedules.entry(schedule_count).write(current_schedule);
             self.schedules_count.write(schedule_count + 1);
-            self.disbursement_schedules.entry(schedule_count + 1).write(disbursement_schedule);
+            self.current_schedule.write(new_disbursement_schedule);
         }
 
-        fn pause_disbursement_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
+        fn pause_disbursement(ref self: ComponentState<TContractState>) {
             self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+            let mut disbursement_schedule = self.current_schedule.read();
             assert(
                 disbursement_schedule.status == ScheduleStatus::ACTIVE,
                 'Schedule Paused or Deleted',
             );
             disbursement_schedule.status = ScheduleStatus::PAUSED;
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+            self.current_schedule.write(disbursement_schedule);
         }
 
-        fn resume_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
+        fn resume_schedule(ref self: ComponentState<TContractState>) {
             self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+            let mut disbursement_schedule = self.current_schedule.read();
             assert(
                 disbursement_schedule.status == ScheduleStatus::PAUSED,
                 'Schedule Active or Deleted',
             );
             disbursement_schedule.status = ScheduleStatus::ACTIVE;
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+            self.current_schedule.write(disbursement_schedule);
         }
 
-        fn delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
-            self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
-            assert(
-                disbursement_schedule.status != ScheduleStatus::DELETED, 'Scedule Already Deleted',
-            );
-            disbursement_schedule.status = ScheduleStatus::DELETED;
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
-        }
-
-        fn add_failed_disbursement(
-            ref self: ComponentState<TContractState>,
-            member: Member,
-            disbursement_id: u256,
-            timestamp: u64,
-            caller: ContractAddress,
-        ) -> bool {
-            let disbursement = UnitDisbursement { caller, timestamp, member };
-            self.failed_disbursements.entry(disbursement_id).write(disbursement);
-            true
-        }
+        // fn add_failed_disbursement(
+        //     ref self: ComponentState<TContractState>,
+        //     member: Member,
+        //     disbursement_id: u256,
+        //     timestamp: u64,
+        //     caller: ContractAddress,
+        // ) -> bool {
+        //     let disbursement = UnitDisbursement { caller, timestamp, member };
+        //     self.failed_disbursements.entry(disbursement_id).write(disbursement);
+        //     true
+        // }
 
         fn update_current_schedule_last_execution(
             ref self: ComponentState<TContractState>, timestamp: u64,
@@ -109,13 +102,14 @@ pub mod DisbursementComponent {
 
         fn set_current_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
             self._assert_caller();
-            let schedule = self.disbursement_schedules.entry(schedule_id).read();
+            let schedule = self.previous_schedules.entry(schedule_id).read();
             assert(schedule.status == ScheduleStatus::ACTIVE, 'Schedule Not Active');
             self.current_schedule.write(schedule);
         }
 
         fn get_current_schedule(self: @ComponentState<TContractState>) -> DisbursementSchedule {
             let disbursement_schedule = self.current_schedule.read();
+            assert(disbursement_schedule != Default::default(), 'No schedule set');
             disbursement_schedule
         }
 
@@ -125,11 +119,14 @@ pub mod DisbursementComponent {
             let mut disbursement_schedules_array: Array<DisbursementSchedule> = array![];
 
             for i in 1..(self.schedules_count.read() + 1) {
-                let current_schedule = self.disbursement_schedules.entry(i).read();
-                if current_schedule.schedule_id != 0 { // Add validation
+                let current_schedule = self.previous_schedules.entry(i).read();
+                if current_schedule.schedule_id != 0
+                    && current_schedule.status != ScheduleStatus::DELETED
+                    && current_schedule != Default::default() { // Add validation
                     disbursement_schedules_array.append(current_schedule);
                 }
             }
+            disbursement_schedules_array.append(self.current_schedule.read());
 
             disbursement_schedules_array
         }
@@ -152,32 +149,25 @@ pub mod DisbursementComponent {
             ref self: ComponentState<TContractState>, schedule_id: u64, new_interval: u64,
         ) {
             self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+            let mut disbursement_schedule = self.previous_schedules.entry(schedule_id).read();
             assert(disbursement_schedule.status != ScheduleStatus::DELETED, 'Schedule Deleted');
 
             disbursement_schedule.interval = new_interval;
 
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+            self.previous_schedules.entry(schedule_id).write(disbursement_schedule);
         }
 
         fn update_schedule_type(
             ref self: ComponentState<TContractState>, schedule_id: u64, schedule_type: ScheduleType,
         ) {
             self._assert_caller();
-            let mut disbursement_schedule = self.disbursement_schedules.entry(schedule_id).read();
+            let mut disbursement_schedule = self.previous_schedules.entry(schedule_id).read();
             assert(disbursement_schedule.status != ScheduleStatus::DELETED, 'Schedule Deleted');
 
             disbursement_schedule.schedule_type = schedule_type;
 
-            self.disbursement_schedules.entry(schedule_id).write(disbursement_schedule);
+            self.previous_schedules.entry(schedule_id).write(disbursement_schedule);
         }
-
-
-        fn retry_failed_disbursement(ref self: ComponentState<TContractState>, schedule_id: u64) {
-            self._assert_caller();
-        }
-
-        fn get_pending_failed_disbursements(self: @ComponentState<TContractState>) {}
 
         fn get_last_disburse_time(self: @ComponentState<TContractState>) -> u64 {
             let mut last_disburse_time = 0;
@@ -216,6 +206,16 @@ pub mod DisbursementComponent {
             assert(self.authorized_callers.entry(caller).read(), 'Caller Not Permitted');
         }
 
+        fn _delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
+            self._assert_caller();
+            let mut disbursement_schedule = self.current_schedule.read();
+            assert(
+                disbursement_schedule.status != ScheduleStatus::DELETED, 'Scedule Already Deleted',
+            );
+            disbursement_schedule.status = ScheduleStatus::DELETED;
+            self.current_schedule.write(disbursement_schedule);
+        }
+
         fn _initialize(
             ref self: ComponentState<TContractState>,
             schedule_type: u8,
@@ -238,7 +238,7 @@ pub mod DisbursementComponent {
                 interval,
                 last_execution: Option::None,
             };
-            self.disbursement_schedules.entry(schedule_count + 1).write(disbursement_schedule);
+            self.previous_schedules.entry(schedule_count + 1).write(disbursement_schedule);
             self.schedules_count.write(schedule_count + 1);
             self.current_schedule.write(disbursement_schedule);
         }

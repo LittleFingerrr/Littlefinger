@@ -31,8 +31,6 @@ pub trait IFactory<T> {
         ref self: T,
         // class_hash: felt252, //unwrap it into class has using into, and it will be removed once I
         // declare the vault
-        available_funds: u256,
-        starting_bonus_allocation: u256,
         token: ContractAddress,
         salt: felt252,
         // class_hash: felt252,

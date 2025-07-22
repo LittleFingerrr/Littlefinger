@@ -104,13 +104,14 @@ pub mod Vault {
     #[constructor]
     fn constructor(
         ref self: ContractState,
-        token: ContractAddress,
-        available_funds: u256,
-        bonus_allocation: u256,
+        token: ContractAddress, // available_funds: u256,
+        // bonus_allocation: u256,
         owner: ContractAddress,
     ) {
+        let token_dispatcher = IERC20Dispatcher { contract_address: token };
+        let available_funds = token_dispatcher.balance_of(get_contract_address());
         self.available_funds.write(available_funds);
-        self.total_bonus.write(bonus_allocation);
+        self.total_bonus.write(0);
         self.token.write(token);
         // let caller = get_caller_address();
         self.permitted_addresses.entry(owner).write(true);
@@ -165,16 +166,18 @@ pub mod Vault {
             );
 
             let timestamp = get_block_timestamp();
-            assert(amount <= self.available_funds.read(), 'Insufficient Balance');
+
             let token = self.token.read();
             let token_dispatcher = IERC20Dispatcher { contract_address: token };
+            let vault_balance = token_dispatcher.balance_of(get_contract_address());
+            assert(amount <= vault_balance, 'Insufficient Balance');
 
             token_dispatcher.transfer(address, amount);
             self._record_transaction(token, amount, TransactionType::WITHDRAWAL, address);
             // assert(transfer, 'Withdrawal unsuccessful');
 
             let prev_available_funds = self.available_funds.read();
-            self.available_funds.write(prev_available_funds - amount);
+            // self.available_funds.write(prev_available_funds - amount);
 
             self.emit(WithdrawalSuccessful { caller: address, token, amount, timestamp })
         }
@@ -214,7 +217,11 @@ pub mod Vault {
         fn get_balance(self: @ContractState) -> u256 {
             // let caller = get_caller_address();
             // assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
-            self.available_funds.read()
+            let token_address = self.token.read();
+            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
+            let vault_address = get_contract_address();
+            let balance = token_dispatcher.balance_of(vault_address);
+            balance
         }
 
         fn get_bonus_allocation(self: @ContractState) -> u256 {
@@ -228,6 +235,8 @@ pub mod Vault {
             assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
             let token_address = self.token.read();
             let token = IERC20Dispatcher { contract_address: token_address };
+            let token_balance = token.balance_of(get_contract_address());
+            assert(amount <= token_balance, 'Amount Overflow');
             let transfer = token.transfer(recipient, amount);
             assert(transfer, 'Transfer failed');
             self._record_transaction(token_address, amount, TransactionType::PAYMENT, caller);
