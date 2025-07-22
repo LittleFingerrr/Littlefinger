@@ -95,8 +95,6 @@ pub mod Factory {
     pub impl FactoryImpl of IFactory<ContractState> {
         fn setup_org(
             ref self: ContractState,
-            available_funds: u256,
-            starting_bonus_allocation: u256,
             token: ContractAddress,
             salt: felt252,
             // class_hash: felt252,
@@ -114,7 +112,7 @@ pub mod Factory {
         ) -> (ContractAddress, ContractAddress) {
             // let deployer = get_caller_address();
             let vault_address = self
-                .deploy_vault(available_funds, starting_bonus_allocation, token, salt, owner);
+                .deploy_vault(token, salt, owner);
             let org_core_address = self
                 .deploy_org_core(
                     owner,
@@ -179,8 +177,6 @@ pub mod Factory {
             ref self: ContractState,
             // class_hash: felt252, //unwrap it into class has using into, and it will be removed
             // once I declare the vault
-            available_funds: u256,
-            starting_bonus_allocation: u256,
             token: ContractAddress,
             salt: felt252,
             owner: ContractAddress,
