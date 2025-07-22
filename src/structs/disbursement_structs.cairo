@@ -37,9 +37,9 @@ pub enum DisbursementStatus {
 
 #[derive(Copy, Drop, Serde, PartialEq, Debug, starknet::Store, Default)]
 pub enum ScheduleType {
-    RECURRING, //1
+    RECURRING,
     #[default]
-    ONETIME //1
+    ONETIME
     // TODO:
 // We have to come up with how to implement this conditional. Off the top of my head, it could
 // be other people validating your work, meaning it should be for the more decentralized scheme
