@@ -102,13 +102,9 @@ pub mod Vault {
     // TODO:
     // Add to this constructor, a way to add addresses and store them as permitted addresses here
     #[constructor]
-    fn constructor(
-        ref self: ContractState,
-        token: ContractAddress,
-        // available_funds: u256,
-        // bonus_allocation: u256,
-        owner: ContractAddress,
-    ) {
+    fn constructor(ref self: ContractState, token: ContractAddress, // available_funds: u256,
+    // bonus_allocation: u256,
+    owner: ContractAddress) {
         let token_dispatcher = IERC20Dispatcher { contract_address: token };
         let available_funds = token_dispatcher.balance_of(get_contract_address());
         self.available_funds.write(available_funds);
@@ -167,7 +163,7 @@ pub mod Vault {
             );
 
             let timestamp = get_block_timestamp();
-            
+
             let token = self.token.read();
             let token_dispatcher = IERC20Dispatcher { contract_address: token };
             let vault_balance = token_dispatcher.balance_of(get_contract_address());

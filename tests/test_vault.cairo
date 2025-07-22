@@ -114,10 +114,7 @@ fn deploy_vault() -> (IVaultDispatcher, ContractAddress, ContractAddress) {
     let owner_address = owner();
 
     // Use array! macro with explicit typing for deployment
-    let constructor_calldata = array![
-        token_address.into(),
-        owner_address.into(),
-    ];
+    let constructor_calldata = array![token_address.into(), owner_address.into()];
 
     let (vault_address, _) = vault_contract.deploy(@constructor_calldata).unwrap();
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };

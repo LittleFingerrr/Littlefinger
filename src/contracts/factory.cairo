@@ -111,8 +111,7 @@ pub mod Factory {
             // salt: felt252,
         ) -> (ContractAddress, ContractAddress) {
             // let deployer = get_caller_address();
-            let vault_address = self
-                .deploy_vault(token, salt, owner);
+            let vault_address = self.deploy_vault(token, salt, owner);
             let org_core_address = self
                 .deploy_org_core(
                     owner,
@@ -174,12 +173,9 @@ pub mod Factory {
     #[generate_trait]
     pub impl InternalImpl of InternalTrait {
         fn deploy_vault(
-            ref self: ContractState,
-            // class_hash: felt252, //unwrap it into class has using into, and it will be removed
+            ref self: ContractState, // class_hash: felt252, //unwrap it into class has using into, and it will be removed
             // once I declare the vault
-            token: ContractAddress,
-            salt: felt252,
-            owner: ContractAddress,
+            token: ContractAddress, salt: felt252, owner: ContractAddress,
         ) -> ContractAddress {
             let vault_count = self.vaults_count.read();
             let vault_id: u256 = vault_count.try_into().unwrap();

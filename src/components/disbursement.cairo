@@ -4,7 +4,7 @@ pub mod DisbursementComponent {
     use littlefinger::structs::disbursement_structs::{
         DisbursementSchedule, ScheduleStatus, ScheduleType, UnitDisbursement,
     };
-    use littlefinger::structs::member_structs::{MemberResponse};
+    use littlefinger::structs::member_structs::MemberResponse;
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
@@ -120,7 +120,8 @@ pub mod DisbursementComponent {
 
             for i in 1..(self.schedules_count.read() + 1) {
                 let current_schedule = self.previous_schedules.entry(i).read();
-                if current_schedule.schedule_id != 0 && current_schedule.status != ScheduleStatus::DELETED
+                if current_schedule.schedule_id != 0
+                    && current_schedule.status != ScheduleStatus::DELETED
                     && current_schedule != Default::default() { // Add validation
                     disbursement_schedules_array.append(current_schedule);
                 }
