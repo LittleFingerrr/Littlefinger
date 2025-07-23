@@ -8,6 +8,7 @@ pub mod Vault {
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
+    use core::num::traits::Zero;
     use starknet::{
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
     };
@@ -128,6 +129,8 @@ pub mod Vault {
     #[abi(embed_v0)]
     pub impl VaultImpl of IVault<ContractState> {
         fn deposit_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
+            assert(amount.is_non_zero(), 'Invalid Amount');
+            assert(address.is_non_zero(), 'Invalid Address');
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
@@ -155,6 +158,8 @@ pub mod Vault {
         }
 
         fn withdraw_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
+            assert(amount.is_non_zero(), 'Invalid Amount');
+            assert(address.is_non_zero(), 'Invalid Address');
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
@@ -185,6 +190,8 @@ pub mod Vault {
         fn add_to_bonus_allocation(
             ref self: ContractState, amount: u256, address: ContractAddress,
         ) {
+            assert(amount.is_non_zero(), 'Invalid Amount');
+            assert(address.is_non_zero(), 'Invalid Address');
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
@@ -231,6 +238,8 @@ pub mod Vault {
         }
 
         fn pay_member(ref self: ContractState, recipient: ContractAddress, amount: u256) {
+            assert(recipient.is_non_zero(), 'Invalid Address');
+            assert(amount.is_non_zero(), 'Invalid Amount');
             let caller = get_caller_address();
             assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
             let token_address = self.token.read();
@@ -260,6 +269,7 @@ pub mod Vault {
         }
 
         fn allow_org_core_address(ref self: ContractState, org_address: ContractAddress) {
+            assert(org_address.is_non_zero(), 'Invalid Address');
             self.permitted_addresses.entry(org_address).write(true);
         }
     }
