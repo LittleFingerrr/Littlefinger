@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod Vault {
+    use core::num::traits::Zero;
     use littlefinger::interfaces::ivault::IVault;
     use littlefinger::structs::vault_structs::{Transaction, TransactionType, VaultStatus};
     use openzeppelin::access::ownable::OwnableComponent;
@@ -8,7 +9,6 @@ pub mod Vault {
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use core::num::traits::Zero;
     use starknet::{
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
     };
