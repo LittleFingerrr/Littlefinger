@@ -39,7 +39,7 @@ pub enum DisbursementStatus {
 pub enum ScheduleType {
     RECURRING,
     #[default]
-    ONETIME
+    ONETIME,
     // TODO:
 // We have to come up with how to implement this conditional. Off the top of my head, it could
 // be other people validating your work, meaning it should be for the more decentralized scheme
