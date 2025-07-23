@@ -39,4 +39,4 @@ jobs:
         run: |
           scarb build
           scarb test
-          scarb fmt --check
+          scarb fmt

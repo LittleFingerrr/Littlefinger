@@ -170,13 +170,14 @@ mod Core {
             assert(now < current_schedule.end_timestamp, 'Payout period ended');
 
             if let Option::Some(last_execution) = current_schedule.last_execution {
-                assert(
-                    now >= last_execution + current_schedule.interval, 'Payout premature',
-                );
+                assert(now >= last_execution + current_schedule.interval, 'Payout premature');
             }
             let last_execution_ref = current_schedule.last_execution;
             if last_execution_ref.is_some() {
-                assert(now >= (last_execution_ref.unwrap() + current_schedule.interval), 'Payout premature');
+                assert(
+                    now >= (last_execution_ref.unwrap() + current_schedule.interval),
+                    'Payout premature',
+                );
             }
 
             // let mut failed_disbursements = array![];
