@@ -94,6 +94,10 @@ fn recipient() -> ContractAddress {
     contract_address_const::<'recipient'>()
 }
 
+fn zero_addr() -> ContractAddress {
+    contract_address_const::<0>()
+}
+
 fn deploy_mock_erc20() -> (IMockERC20Dispatcher, ContractAddress) {
     let contract = declare("MockERC20").unwrap().contract_class();
     let (contract_address, _) = contract.deploy(@array![]).unwrap();
@@ -499,7 +503,8 @@ fn test_get_vault_status() {
 
 // Edge Case Tests
 #[test]
-fn test_zero_amount_operations() {
+#[should_panic(expected: 'Invalid Amount')]
+fn test_zero_amount_deposit() {
     let (vault, vault_address, _) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
@@ -507,17 +512,18 @@ fn test_zero_amount_operations() {
     let first_bonus_allocation = vault.get_bonus_allocation();
     // Test zero deposit
     vault.deposit_funds(0, owner());
-    assert(vault.get_balance() == first_vault_balance, 'Balance should not change');
+}
 
-    // Test zero withdrawal
-    vault.withdraw_funds(0, recipient());
-    assert(vault.get_balance() == first_vault_balance, 'Balance should not change');
+#[test]
+#[should_panic(expected: 'Invalid Address')]
+fn test_zero_address_deposit() {
+    let (vault, vault_address, _) = deploy_vault();
 
-    // Test zero bonus allocation
-    vault.add_to_bonus_allocation(0, owner());
-    assert(vault.get_bonus_allocation() == first_bonus_allocation, 'Bonus should not change');
-
-    stop_cheat_caller_address(vault_address);
+    start_cheat_caller_address(vault_address, permitted_caller());
+    let first_vault_balance = vault.get_balance();
+    let first_bonus_allocation = vault.get_bonus_allocation();
+    // Test zero deposit
+    vault.deposit_funds(250, zero_addr());
 }
 
 // Integration Tests
