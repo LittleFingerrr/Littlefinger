@@ -2,7 +2,7 @@
 
 > **A decentralized payroll and treasury management system built on Starknet**
 
-Littlefinger is a comprehensive DeFi protocol that enables organizations to manage their treasury, handle member payroll, and automate disbursements on the Starknet blockchain. Named after the master of coin from Game of Thrones, this project brings sophisticated financial management to the decentralized world.
+Littlefinger is a comprehensive DeFi protocol that enables organizations to manage their membership/manpower, manage their treasury, handle member payroll, and automate disbursements on the Starknet blockchain. Named after the master of coin from Game of Thrones, this project brings sophisticated financial management to the decentralized world.
 
 ## 🎯 Project Overview
 
