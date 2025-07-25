@@ -49,7 +49,7 @@ pub mod DisbursementComponent {
                 start_timestamp: start,
                 end_timestamp: end,
                 interval,
-                last_execution: Option::None,
+                last_execution: 0,
             };
             self._delete_schedule(schedule_count);
             self.previous_schedules.entry(schedule_count).write(current_schedule);
@@ -96,7 +96,7 @@ pub mod DisbursementComponent {
         ) {
             self._assert_caller();
             let mut current_schedule = self.current_schedule.read();
-            current_schedule.last_execution = Option::Some(timestamp);
+            current_schedule.last_execution = timestamp;
             self.current_schedule.write(current_schedule);
         }
 
@@ -170,25 +170,19 @@ pub mod DisbursementComponent {
         }
 
         fn get_last_disburse_time(self: @ComponentState<TContractState>) -> u64 {
-            let mut last_disburse_time = 0;
-            if let Option::Some(mut last_execution) = self.current_schedule.read().last_execution {
-                last_disburse_time = last_execution
-            }
-            last_disburse_time
+            self.current_schedule.read().last_execution
         }
 
         fn get_next_disburse_time(self: @ComponentState<TContractState>) -> u64 {
             let current_schedule = self.current_schedule.read();
             let now = get_block_timestamp();
             assert(now < current_schedule.end_timestamp, 'No more disbursement');
-            let mut next_disburse_time = 0;
-            if let Option::Some(mut last_execution) = self.current_schedule.read().last_execution {
-                next_disburse_time = last_execution + current_schedule.interval;
+            let last_execution = current_schedule.last_execution;
+            if last_execution == 0 {
+                current_schedule.start_timestamp
             } else {
-                next_disburse_time = current_schedule.start_timestamp;
+                last_execution + current_schedule.interval
             }
-
-            next_disburse_time
         }
     }
 
@@ -236,7 +230,7 @@ pub mod DisbursementComponent {
                 start_timestamp: start,
                 end_timestamp: end,
                 interval,
-                last_execution: Option::None,
+                last_execution: 0,
             };
             self.previous_schedules.entry(schedule_count + 1).write(disbursement_schedule);
             self.schedules_count.write(schedule_count + 1);
