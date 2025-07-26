@@ -33,9 +33,11 @@ pub mod structs {
 #[cfg(test)]
 pub mod tests {
     pub mod test_dao_controller;
+    pub mod test_disbursement;
     pub mod test_member_manager;
     pub mod mocks {
         pub mod mock_dao_controller;
+        pub mod mock_disbursement;
         pub mod mock_member_manager;
     }
 }
