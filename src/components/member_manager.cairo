@@ -217,7 +217,8 @@ pub mod MemberManagerComponent {
         ) {
             let caller = get_caller_address();
             let current_timestamp = get_block_timestamp();
-            let mut invite = self.member_invites.entry(caller).read();
+            let mut invite: MemberInvite = self.member_invites.entry(caller).read();
+            assert(invite.expiry != 0, 'No such invite');
             if current_timestamp > invite.expiry {
                 invite.invite_status = InviteStatus::EXPIRED;
             }
