@@ -11,6 +11,7 @@ pub trait IVault<TContractState> {
     fn pay_member(ref self: TContractState, recipient: ContractAddress, amount: u256);
     fn add_to_bonus_allocation(ref self: TContractState, amount: u256, address: ContractAddress);
     fn get_balance(self: @TContractState) -> u256;
+    fn get_available_funds(self: @TContractState) -> u256;
     fn get_vault_status(self: @TContractState) -> VaultStatus;
     fn get_bonus_allocation(self: @TContractState) -> u256;
     fn get_transaction_history(self: @TContractState) -> Array<Transaction>;

@@ -109,13 +109,11 @@ pub mod Vault {
         // bonus_allocation: u256,
         owner: ContractAddress,
     ) {
-        let token_dispatcher = IERC20Dispatcher { contract_address: token };
-        let available_funds = token_dispatcher.balance_of(get_contract_address());
-        self.available_funds.write(available_funds);
-        self.total_bonus.write(0);
         self.token.write(token);
-        // let caller = get_caller_address();
+        self.total_bonus.write(0);
         self.permitted_addresses.entry(owner).write(true);
+        
+        self._sync_available_funds();
     }
 
     // TODO:
@@ -139,6 +137,9 @@ pub mod Vault {
             assert(
                 current_vault_status != VaultStatus::VAULTFROZEN, 'Vault Frozen for Transactions',
             );
+
+            self._sync_available_funds();
+            
             let timestamp = get_block_timestamp();
             let this_contract = get_contract_address();
             let token = self.token.read();
@@ -147,13 +148,9 @@ pub mod Vault {
             token_dispatcher.transfer_from(address, this_contract, amount);
 
             self._record_transaction(token, amount, TransactionType::DEPOSIT, address);
-            // Correct me if I'm wrong, but I think recording both failed and unfailed.
-
-            // assert(transfer, 'Transfer unsuccessful');
-
-            let prev_available_funds = self.available_funds.read();
-            self.available_funds.write(prev_available_funds + amount);
-            // self.available_funds.write(prev_available_funds + amount);
+            
+            self._sync_available_funds();
+            
             self.emit(DepositSuccessful { caller: address, token, timestamp, amount })
         }
 
@@ -170,6 +167,8 @@ pub mod Vault {
                 current_vault_status != VaultStatus::VAULTFROZEN, 'Vault Frozen for Transactions',
             );
 
+            self._sync_available_funds();
+
             let timestamp = get_block_timestamp();
 
             let token = self.token.read();
@@ -179,10 +178,8 @@ pub mod Vault {
 
             token_dispatcher.transfer(address, amount);
             self._record_transaction(token, amount, TransactionType::WITHDRAWAL, address);
-            // assert(transfer, 'Withdrawal unsuccessful');
-
-            let prev_available_funds = self.available_funds.read();
-            // self.available_funds.write(prev_available_funds - amount);
+            
+            self._sync_available_funds();
 
             self.emit(WithdrawalSuccessful { caller: address, token, amount, timestamp })
         }
@@ -196,6 +193,9 @@ pub mod Vault {
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
             assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
+            
+            self._sync_available_funds();
+            
             self.total_bonus.write(self.total_bonus.read() + amount);
             self
                 ._record_transaction(
@@ -231,6 +231,10 @@ pub mod Vault {
             balance
         }
 
+        fn get_available_funds(self: @ContractState) -> u256 {
+            self.available_funds.read()
+        }
+
         fn get_bonus_allocation(self: @ContractState) -> u256 {
             // let caller = get_caller_address();
             // assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
@@ -242,6 +246,9 @@ pub mod Vault {
             assert(amount.is_non_zero(), 'Invalid Amount');
             let caller = get_caller_address();
             assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
+            
+            self._sync_available_funds();
+            
             let token_address = self.token.read();
             let token = IERC20Dispatcher { contract_address: token_address };
             let token_balance = token.balance_of(get_contract_address());
@@ -249,8 +256,8 @@ pub mod Vault {
             let transfer = token.transfer(recipient, amount);
             assert(transfer, 'Transfer failed');
             self._record_transaction(token_address, amount, TransactionType::PAYMENT, caller);
-            self.available_funds.write(self.available_funds.read() - amount);
-            // transfer
+            
+            self._sync_available_funds();
         }
 
         fn get_vault_status(self: @ContractState) -> VaultStatus {
@@ -313,6 +320,14 @@ pub mod Vault {
                         token: token_address,
                     },
                 );
+        }
+
+        fn _sync_available_funds(ref self: ContractState) {
+            let token_address = self.token.read();
+            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
+            let vault_address = get_contract_address();
+            let actual_balance = token_dispatcher.balance_of(vault_address);
+            self.available_funds.write(actual_balance);
         }
     }
 }
