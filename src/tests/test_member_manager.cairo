@@ -1,8 +1,10 @@
+use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
 use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
 use littlefinger::structs::member_structs::{MemberRole, MemberRoleIntoU16, MemberStatus};
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
+use littlefinger::tests::utils::factory::setup_factory_and_org_helper;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
     start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
@@ -65,7 +67,7 @@ fn test_add_member_successful() {
     let caller = caller();
 
     start_cheat_caller_address(mock_contract.contract_address, caller);
-    mock_contract.add_member(fname, lname, alias, role, member);
+    mock_contract.add_member(fname, lname, alias, role, member, None, None);
 
     let member_response = mock_contract.get_member(2);
 
@@ -78,6 +80,35 @@ fn test_add_member_successful() {
 }
 
 #[test]
+fn test_add_member_with_factory_and_core_org_successful() {
+    let mock_contract = deploy_mock_contract();
+
+    let (fname, lname, alias, role, member) = member_details();
+
+    let caller = caller();
+    let (factory_address, _, core_org_address, vault_address) = setup_factory_and_org_helper();
+
+    start_cheat_caller_address(mock_contract.contract_address, caller);
+    mock_contract
+        .add_member(
+            fname, lname, alias, role, member, Some(factory_address), Some(core_org_address),
+        );
+
+    let member_response = mock_contract.get_member(2);
+    let factory_dispatch = IFactoryDispatcher { contract_address: factory_address };
+    let factory_get_vault_orgs_pairs = factory_dispatch.get_vault_org_pairs(1.try_into().unwrap());
+    println!("gabidhiahiuahiaias: {:?}", factory_get_vault_orgs_pairs);
+
+    stop_cheat_caller_address(mock_contract.contract_address);
+    assert(member_response.fname == fname, 'Wrong first name');
+    assert(member_response.lname == lname, 'Wrong last name');
+    assert(member_response.alias == alias, 'Wrong alias');
+    assert(MemberRoleIntoU16::into(member_response.role) == role, 'Wrong role');
+    assert(member_response.address == member, 'Wrong address');
+    assert((core_org_address, vault_address) == *factory_get_vault_orgs_pairs.at(0), 'Wrong pairs');
+}
+
+#[test]
 fn test_add_admin_successful() {
     let mock_contract = deploy_mock_contract();
 
@@ -87,7 +118,7 @@ fn test_add_admin_successful() {
     let admin = admin();
 
     start_cheat_caller_address(mock_contract.contract_address, caller);
-    mock_contract.add_member(fname, lname, alias, role, member);
+    mock_contract.add_member(fname, lname, alias, role, member, None, None);
     let mut member_response = mock_contract.get_member(2);
     stop_cheat_caller_address(mock_contract.contract_address);
 
@@ -114,7 +145,7 @@ fn test_add_admin_not_admin() {
     let caller = caller();
 
     start_cheat_caller_address(mock_contract.contract_address, caller);
-    mock_contract.add_member(fname, lname, alias, role, member);
+    mock_contract.add_member(fname, lname, alias, role, member, None, None);
     let mut _member_response = mock_contract.get_member(1);
     mock_contract.add_admin(1);
     stop_cheat_caller_address(mock_contract.contract_address);
@@ -128,7 +159,7 @@ fn test_update_member_details_successful() {
 
     // Add member first
     start_cheat_caller_address(mock_contract.contract_address, member_addr);
-    mock_contract.add_member(fname, lname, alias, role, member_addr);
+    mock_contract.add_member(fname, lname, alias, role, member_addr, None, None);
 
     // Update member details
     let new_fname = 'Jane';
@@ -157,7 +188,7 @@ fn test_update_member_base_pay_successful() {
 
     // Add member first
     start_cheat_caller_address(mock_contract.contract_address, member_addr);
-    mock_contract.add_member(fname, lname, alias, role, member_addr);
+    mock_contract.add_member(fname, lname, alias, role, member_addr, None, None);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     // Update base pay as admin
@@ -181,7 +212,7 @@ fn test_update_member_base_pay_unauthorized() {
 
     // Add member first
     start_cheat_caller_address(mock_contract.contract_address, member_addr);
-    mock_contract.add_member(fname, lname, alias, role, member_addr);
+    mock_contract.add_member(fname, lname, alias, role, member_addr, None, None);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     // Try to update base pay as non-admin (should fail)
@@ -199,7 +230,7 @@ fn test_suspend_and_reinstate_member() {
 
     // Add member first
     start_cheat_caller_address(mock_contract.contract_address, member_addr);
-    mock_contract.add_member(fname, lname, alias, role, member_addr);
+    mock_contract.add_member(fname, lname, alias, role, member_addr, None, None);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     // Suspend member
@@ -232,12 +263,12 @@ fn test_get_members() {
 
     // Add first member
     start_cheat_caller_address(mock_contract.contract_address, member1_addr);
-    mock_contract.add_member(fname1, lname1, alias1, role1, member1_addr);
+    mock_contract.add_member(fname1, lname1, alias1, role1, member1_addr, None, None);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     // Add second member
     start_cheat_caller_address(mock_contract.contract_address, member2_addr);
-    mock_contract.add_member(fname2, lname2, alias2, role2, member2_addr);
+    mock_contract.add_member(fname2, lname2, alias2, role2, member2_addr, None, None);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     let members = mock_contract.get_members();
@@ -334,7 +365,7 @@ fn test_get_role_value() {
 
     // Add member first
     start_cheat_caller_address(mock_contract.contract_address, member_addr);
-    mock_contract.add_member('John', 'Doe', 'johndoe', 5, member_addr);
+    mock_contract.add_member('John', 'Doe', 'johndoe', 5, member_addr, None, None);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     let role = mock_contract.get_member(2).role;
@@ -366,7 +397,7 @@ fn test_add_member_zero_address() {
 
     start_cheat_caller_address(mock_contract.contract_address, contract_address_const::<0>());
 
-    mock_contract.add_member('John', 'Doe', 'johndoe', 5, member());
+    mock_contract.add_member('John', 'Doe', 'johndoe', 5, member(), None, None);
 
     stop_cheat_caller_address(mock_contract.contract_address);
 }

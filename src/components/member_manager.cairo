@@ -1,6 +1,7 @@
 #[starknet::component]
 pub mod MemberManagerComponent {
     use core::num::traits::Zero;
+    use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
     // use littlefinger::interfaces::icore::IConfig;
     use littlefinger::interfaces::imember_manager::IMemberManager;
     use littlefinger::structs::member_structs::{
@@ -42,6 +43,8 @@ pub mod MemberManagerComponent {
             alias: felt252,
             role: u16, //Role is from 0 - 14
             address: ContractAddress,
+            factory: Option<ContractAddress>,
+            core_org: Option<ContractAddress>,
         ) {
             // In this implementation, we are imagining the person who wants to register is calling
             // the function with their wallet actually.
@@ -73,6 +76,11 @@ pub mod MemberManagerComponent {
             member.total_received.write(Option::Some(0));
             member.total_disbursements.write(Option::Some(0));
             self.member_count.write(id);
+
+            if let (Some(factory_address), Some(org_address)) = (factory, core_org) {
+                let factory_dispatcher = IFactoryDispatcher { contract_address: factory_address };
+                factory_dispatcher.update_member_of(address, org_address);
+            }
         }
 
         fn add_admin(ref self: ComponentState<TContractState>, member_id: u256) {

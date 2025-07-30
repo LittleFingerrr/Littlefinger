@@ -10,6 +10,7 @@ use littlefinger::structs::member_structs::{
     InviteStatus, MemberInvite, MemberRole, MemberRoleIntoU16,
 };
 use littlefinger::tests::mocks::mock_dao_controller::MockDaoController;
+use littlefinger::tests::utils::factory::setup_factory_and_org_helper;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
     start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
@@ -38,6 +39,15 @@ fn deploy_mock_voting_contract() -> IVoteDispatcher {
     member1.serialize(ref calldata);
     member2.serialize(ref calldata);
     member3.serialize(ref calldata);
+    let (factory1, _, core_org1, _) = setup_factory_and_org_helper();
+    let (factory2, _, core_org2, _) = setup_factory_and_org_helper();
+    let (factory3, _, core_org3, _) = setup_factory_and_org_helper();
+    Some(factory1).serialize(ref calldata);
+    Some(factory2).serialize(ref calldata);
+    Some(factory3).serialize(ref calldata);
+    Some(core_org1).serialize(ref calldata);
+    Some(core_org2).serialize(ref calldata);
+    Some(core_org3).serialize(ref calldata);
     let (contract_address, _) = contract_class.deploy(@calldata.into()).unwrap();
     IVoteDispatcher { contract_address }
 }
