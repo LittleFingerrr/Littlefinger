@@ -257,7 +257,7 @@ fn test_schedule_payout_full_flow_success() {
     stop_cheat_caller_address(core_address);
 
     // Set block timestamp to be within the payout period
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
 
     // Get initial balances
     let employee1_initial_balance = token_dispatcher.balance_of(employee1());
@@ -286,7 +286,7 @@ fn test_schedule_payout_full_flow_success() {
     let updated_schedule = disbursement_dispatcher.get_current_schedule();
     assert(updated_schedule.last_execution == start_time + 100, 'Last execution should be updated');
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -316,13 +316,13 @@ fn test_schedule_payout_before_start_time() {
     stop_cheat_caller_address(core_address);
 
     // Set timestamp before start time
-    start_cheat_block_timestamp(start_time - 100);
+    start_cheat_block_timestamp(core_address , start_time - 100);
 
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -340,13 +340,13 @@ fn test_schedule_payout_after_end_time() {
     stop_cheat_caller_address(core_address);
 
     // Set timestamp after end time
-    start_cheat_block_timestamp(end_time + 100);
+    start_cheat_block_timestamp(core_address , end_time + 100);
 
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -364,18 +364,18 @@ fn test_schedule_payout_premature_execution() {
     stop_cheat_caller_address(core_address);
 
     // First payout
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
     // Try second payout (before interval)
-    start_cheat_block_timestamp(start_time + 200); 
+    start_cheat_block_timestamp(core_address , start_time + 200); 
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout(); // Should fail
     stop_cheat_caller_address(core_address);
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -392,7 +392,7 @@ fn test_schedule_payout_multiple_intervals() {
     stop_cheat_caller_address(core_address);
 
     // First payout
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     let vault_balance_before_first = vault_dispatcher.get_balance();
     
     start_cheat_caller_address(core_address, owner());
@@ -403,7 +403,7 @@ fn test_schedule_payout_multiple_intervals() {
     assert(vault_balance_after_first < vault_balance_before_first, 'First payout should reduce balance');
 
     // Second payout after interval
-    start_cheat_block_timestamp(start_time + interval + 200);
+    start_cheat_block_timestamp(core_address , start_time + interval + 200);
     
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
@@ -412,7 +412,7 @@ fn test_schedule_payout_multiple_intervals() {
     let vault_balance_after_second = vault_dispatcher.get_balance();
     assert(vault_balance_after_second < vault_balance_after_first, 'Second payout should reduce balance further');
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -428,7 +428,7 @@ fn test_schedule_payout_role_based_distribution() {
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
 
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
 
     // Get initial balances
     let employee1_initial = token_dispatcher.balance_of(employee1());
@@ -454,7 +454,7 @@ fn test_schedule_payout_role_based_distribution() {
     assert(employee2_payment > contractor1_payment, 'Employee should earn more than contractor');
     assert(employee1_payment > employee2_payment, 'Higher base pay should result in higher payment');
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -475,14 +475,14 @@ fn test_schedule_payout_with_paused_schedule() {
     disbursement_dispatcher.pause_disbursement();
     stop_cheat_caller_address(core_address);
 
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
 
     // Try to execute payout with paused schedule - should fail
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -498,14 +498,14 @@ fn test_schedule_payout_empty_organization() {
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
 
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
 
     // Should not panic even with no members
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 // Integration test covering the complete workflow
@@ -533,7 +533,7 @@ fn test_complete_disbursement_workflow() {
     let mut payout_count = 0;
     
     while current_time < end_time && payout_count < 3 {
-        start_cheat_block_timestamp(current_time);
+        start_cheat_block_timestamp(core_address , current_time);
         
         let vault_balance_before = vault_dispatcher.get_balance();
         
@@ -548,7 +548,7 @@ fn test_complete_disbursement_workflow() {
         let updated_schedule = disbursement_dispatcher.get_current_schedule();
         assert(updated_schedule.last_execution == current_time, 'Last execution should be updated');
         
-        stop_cheat_block_timestamp();
+        stop_cheat_block_timestamp(core_address);
         
         current_time += interval + 100; 
         payout_count += 1;
@@ -567,7 +567,7 @@ fn test_compute_remuneration_accuracy() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     
     // Assume role weights: EMPLOYEE=2, CONTRACTOR=1 (adjust based on actual MemberRoleIntoU16)
     let total_bonus = vault_dispatcher.get_bonus_allocation();
@@ -584,7 +584,7 @@ fn test_compute_remuneration_accuracy() {
     stop_cheat_caller_address(core_address);
     let employee1_final = token_dispatcher.balance_of(employee1());
     assert(employee1_final - employee1_initial == expected_employee1_payment, 'Incorrect employee1 payment');
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -601,11 +601,11 @@ fn test_schedule_payout_insufficient_vault_balance() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -619,17 +619,17 @@ fn test_schedule_payout_onetime_single_execution() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(1, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     start_cheat_caller_address(core_address, owner());
     // First payout should succeed
     core_dispatcher.schedule_payout(); 
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time + 200);
+    start_cheat_block_timestamp(core_address , start_time + 200);
     start_cheat_caller_address(core_address, owner());
     // Second payout should fail
     core_dispatcher.schedule_payout(); 
     stop_cheat_caller_address(core_address);
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -643,12 +643,12 @@ fn test_schedule_payout_unauthorized_caller() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     // Non-owner
     start_cheat_caller_address(core_address, employee1()); 
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -666,13 +666,13 @@ fn test_schedule_payout_excludes_inactive_members() {
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
     let employee1_initial = token_dispatcher.balance_of(employee1());
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
     let employee1_final = token_dispatcher.balance_of(employee1());
     assert(employee1_final == employee1_initial, 'Inactive member should not receive payment');
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -696,34 +696,38 @@ fn test_schedule_payout_large_member_set() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address , start_time + 100);
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
 fn test_schedule_payout_zero_bonus_allocation() {
     let (core_dispatcher, core_address, vault_dispatcher, vault_address, token_dispatcher, _) = setup_full_organization();
     add_test_members(core_dispatcher, core_address);
-    start_cheat_caller_address(vault_address, owner());
-    vault_dispatcher.withdraw_bonus_allocation(vault_dispatcher.get_bonus_allocation(), owner()); // Clear bonus
-    stop_cheat_caller_address(vault_address);
+    // Ensure bonus allocation is zero for this test
+    let bonus_allocation = vault_dispatcher.get_bonus_allocation();
+    
     let start_time = 1000000;
     let end_time = 2000000;
     let interval = 86400;
+
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
+
     let employee1_initial = token_dispatcher.balance_of(employee1());
-    start_cheat_block_timestamp(start_time + 100);
+    start_cheat_block_timestamp(core_address, start_time + 100);
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
     let employee1_final = token_dispatcher.balance_of(employee1());
+
     assert(employee1_final > employee1_initial, 'Base pay should be distributed');
-    stop_cheat_block_timestamp();
+
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -736,11 +740,11 @@ fn test_schedule_payout_at_start_timestamp() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(start_time); 
+    start_cheat_block_timestamp(core_address , start_time); 
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout(); 
     stop_cheat_caller_address(core_address);
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
 
 #[test]
@@ -754,9 +758,9 @@ fn test_schedule_payout_at_end_timestamp() {
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
-    start_cheat_block_timestamp(end_time); 
+    start_cheat_block_timestamp(core_address , end_time); 
     start_cheat_caller_address(core_address, owner());
     core_dispatcher.schedule_payout(); 
     stop_cheat_caller_address(core_address);
-    stop_cheat_block_timestamp();
+    stop_cheat_block_timestamp(core_address);
 }
