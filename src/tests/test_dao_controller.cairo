@@ -39,15 +39,9 @@ fn deploy_mock_voting_contract() -> IVoteDispatcher {
     member1.serialize(ref calldata);
     member2.serialize(ref calldata);
     member3.serialize(ref calldata);
-    let (factory1, _, core_org1, _) = setup_factory_and_org_helper();
-    let (factory2, _, core_org2, _) = setup_factory_and_org_helper();
-    let (factory3, _, core_org3, _) = setup_factory_and_org_helper();
-    Some(factory1).serialize(ref calldata);
-    Some(factory2).serialize(ref calldata);
-    Some(factory3).serialize(ref calldata);
-    Some(core_org1).serialize(ref calldata);
-    Some(core_org2).serialize(ref calldata);
-    Some(core_org3).serialize(ref calldata);
+    let (factory, _, core_org, _) = setup_factory_and_org_helper();
+    factory.serialize(ref calldata);
+    core_org.serialize(ref calldata);
     let (contract_address, _) = contract_class.deploy(@calldata.into()).unwrap();
     IVoteDispatcher { contract_address }
 }

@@ -23,6 +23,8 @@ pub mod MemberManagerComponent {
         pub role_value: Vec<u16>,
         pub config: MemberConfigNode,
         pub member_invites: Map<ContractAddress, MemberInvite>,
+        pub factory: ContractAddress,
+        pub core_org: ContractAddress,
     }
 
     #[event]
@@ -43,8 +45,6 @@ pub mod MemberManagerComponent {
             alias: felt252,
             role: u16, //Role is from 0 - 14
             address: ContractAddress,
-            factory: Option<ContractAddress>,
-            core_org: Option<ContractAddress>,
         ) {
             // In this implementation, we are imagining the person who wants to register is calling
             // the function with their wallet actually.
@@ -77,10 +77,8 @@ pub mod MemberManagerComponent {
             member.total_disbursements.write(Option::Some(0));
             self.member_count.write(id);
 
-            if let (Some(factory_address), Some(org_address)) = (factory, core_org) {
-                let factory_dispatcher = IFactoryDispatcher { contract_address: factory_address };
-                factory_dispatcher.update_member_of(address, org_address);
-            }
+            let factory_dispatcher = IFactoryDispatcher { contract_address: self.factory.read() };
+            factory_dispatcher.update_member_of(address, self.core_org.read());
         }
 
         fn add_admin(ref self: ComponentState<TContractState>, member_id: u256) {
@@ -288,6 +286,8 @@ pub mod MemberManagerComponent {
             lname: felt252,
             alias: felt252,
             owner: ContractAddress,
+            factory: ContractAddress,
+            core_org: ContractAddress,
             // config: MemberConfig,
         ) {
             // This will be for making admins and giving people control/taking it away
@@ -318,6 +318,8 @@ pub mod MemberManagerComponent {
             // self.admins.entry(admin_count + 1).write(new_admin);
             self.member_count.write(self.member_count.read() + 1);
             self.admin_count.write(admin_count + 1);
+            self.factory.write(factory);
+            self.core_org.write(core_org);
         }
 
         fn get_role_value(self: @ComponentState<TContractState>, member_id: u256) -> u16 {

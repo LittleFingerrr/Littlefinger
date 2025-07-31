@@ -10,8 +10,6 @@ pub trait IMemberManager<TContractState> {
         alias: felt252,
         role: u16, // Role goes from 0 to 14
         address: ContractAddress,
-        factory: Option<ContractAddress>,
-        core_org: Option<ContractAddress>,
         // weight: u256
     ); //-> u256;
     fn add_admin(ref self: TContractState, member_id: u256);

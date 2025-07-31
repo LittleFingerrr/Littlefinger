@@ -12,7 +12,10 @@ pub mod Factory {
         Vec, VecTrait,
     };
     use starknet::syscalls::deploy_syscall;
-    use starknet::{ContractAddress, SyscallResultTrait, get_block_timestamp, get_caller_address};
+    use starknet::{
+        ContractAddress, SyscallResultTrait, get_block_timestamp, get_caller_address,
+        get_contract_address,
+    };
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
@@ -114,6 +117,7 @@ pub mod Factory {
         ) -> (ContractAddress, ContractAddress) {
             // let deployer = get_caller_address();
             let vault_address = self.deploy_vault(token, salt, owner);
+            let factory = get_contract_address();
             let org_core_address = self
                 .deploy_org_core(
                     owner,
@@ -125,6 +129,7 @@ pub mod Factory {
                     first_admin_alias,
                     salt + 1,
                     organization_type,
+                    factory,
                 );
             self.vault_org_pairs.entry(owner).push((org_core_address, vault_address));
             let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
@@ -257,6 +262,7 @@ pub mod Factory {
             first_admin_alias: felt252,
             salt: felt252,
             organization_type: u8,
+            factory: ContractAddress,
         ) -> ContractAddress {
             let deployer = get_caller_address();
             let org_count = self.orgs_count.read();
@@ -288,6 +294,7 @@ pub mod Factory {
             first_admin_alias.serialize(ref constructor_calldata);
             deployer.serialize(ref constructor_calldata);
             organization_type.serialize(ref constructor_calldata);
+            factory.serialize(ref constructor_calldata);
 
             let processed_class_hash: ClassHash = self.org_core_class_hash.read();
 

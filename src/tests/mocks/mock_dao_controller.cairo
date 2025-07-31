@@ -55,49 +55,23 @@ pub mod MockDaoController {
         member1: ContractAddress,
         member2: ContractAddress,
         member3: ContractAddress,
-        factory1: Option<ContractAddress>,
-        factory2: Option<ContractAddress>,
-        factory3: Option<ContractAddress>,
-        core_org1: Option<ContractAddress>,
-        core_org2: Option<ContractAddress>,
-        core_org3: Option<ContractAddress>,
+        factory: ContractAddress,
+        core_org: ContractAddress,
     ) {
         self.dao_controller._initialize(admin, config, threshold);
         self
             .member_manager
-            ._initialize(first_admin_fname, first_admin_lname, first_admin_alias, admin);
-        self
-            .member_manager
-            .add_member(
-                'Member1'.into(),
-                'LastName1'.into(),
-                'Alias1'.into(),
-                5,
-                member1,
-                factory1,
-                core_org1,
+            ._initialize(
+                first_admin_fname, first_admin_lname, first_admin_alias, admin, factory, core_org,
             );
         self
             .member_manager
-            .add_member(
-                'Member2'.into(),
-                'LastName2'.into(),
-                'Alias2'.into(),
-                0,
-                member2,
-                factory2,
-                core_org2,
-            );
+            .add_member('Member1'.into(), 'LastName1'.into(), 'Alias1'.into(), 5, member1);
         self
             .member_manager
-            .add_member(
-                'Member3'.into(),
-                'LastName3'.into(),
-                'Alias3'.into(),
-                5,
-                member3,
-                factory3,
-                core_org3,
-            );
+            .add_member('Member2'.into(), 'LastName2'.into(), 'Alias2'.into(), 0, member2);
+        self
+            .member_manager
+            .add_member('Member3'.into(), 'LastName3'.into(), 'Alias3'.into(), 5, member3);
     }
 }
