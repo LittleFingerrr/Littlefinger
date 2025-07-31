@@ -32,10 +32,14 @@ pub mod MockMemberManager {
         first_admin_lname: felt252,
         first_admin_alias: felt252,
         admin: ContractAddress,
+        factory: ContractAddress,
+        core_org: ContractAddress,
     ) {
         self
             .member_manager
-            ._initialize(first_admin_fname, first_admin_lname, first_admin_alias, admin);
+            ._initialize(
+                first_admin_fname, first_admin_lname, first_admin_alias, admin, factory, core_org,
+            );
 
         // Initialize role values if needed - using modern storage syntax
         #[feature("starknet-storage-deprecation")]

@@ -112,7 +112,7 @@ pub mod Vault {
         self.token.write(token);
         self.total_bonus.write(0);
         self.permitted_addresses.entry(owner).write(true);
-        
+
         self._sync_available_funds();
     }
 
@@ -139,7 +139,7 @@ pub mod Vault {
             );
 
             self._sync_available_funds();
-            
+
             let timestamp = get_block_timestamp();
             let this_contract = get_contract_address();
             let token = self.token.read();
@@ -148,9 +148,9 @@ pub mod Vault {
             token_dispatcher.transfer_from(address, this_contract, amount);
 
             self._record_transaction(token, amount, TransactionType::DEPOSIT, address);
-            
+
             self._sync_available_funds();
-            
+
             self.emit(DepositSuccessful { caller: address, token, timestamp, amount })
         }
 
@@ -178,7 +178,7 @@ pub mod Vault {
 
             token_dispatcher.transfer(address, amount);
             self._record_transaction(token, amount, TransactionType::WITHDRAWAL, address);
-            
+
             self._sync_available_funds();
 
             self.emit(WithdrawalSuccessful { caller: address, token, amount, timestamp })
@@ -193,9 +193,9 @@ pub mod Vault {
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
             assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
-            
+
             self._sync_available_funds();
-            
+
             self.total_bonus.write(self.total_bonus.read() + amount);
             self
                 ._record_transaction(
@@ -246,9 +246,9 @@ pub mod Vault {
             assert(amount.is_non_zero(), 'Invalid Amount');
             let caller = get_caller_address();
             assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
-            
+
             self._sync_available_funds();
-            
+
             let token_address = self.token.read();
             let token = IERC20Dispatcher { contract_address: token_address };
             let token_balance = token.balance_of(get_contract_address());
@@ -256,7 +256,7 @@ pub mod Vault {
             let transfer = token.transfer(recipient, amount);
             assert(transfer, 'Transfer failed');
             self._record_transaction(token_address, amount, TransactionType::PAYMENT, caller);
-            
+
             self._sync_available_funds();
         }
 
