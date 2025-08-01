@@ -1,6 +1,7 @@
 #[starknet::component]
 pub mod MemberManagerComponent {
     use core::num::traits::Zero;
+    use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
     // use littlefinger::interfaces::icore::IConfig;
     use littlefinger::interfaces::imember_manager::IMemberManager;
     use littlefinger::structs::member_structs::{
@@ -22,6 +23,8 @@ pub mod MemberManagerComponent {
         pub role_value: Vec<u16>,
         pub config: MemberConfigNode,
         pub member_invites: Map<ContractAddress, MemberInvite>,
+        pub factory: ContractAddress,
+        pub core_org: ContractAddress,
     }
 
     #[event]
@@ -73,6 +76,9 @@ pub mod MemberManagerComponent {
             member.total_received.write(Option::Some(0));
             member.total_disbursements.write(Option::Some(0));
             self.member_count.write(id);
+
+            let factory_dispatcher = IFactoryDispatcher { contract_address: self.factory.read() };
+            factory_dispatcher.update_member_of(address, self.core_org.read());
         }
 
         fn add_admin(ref self: ComponentState<TContractState>, member_id: u256) {
@@ -280,6 +286,8 @@ pub mod MemberManagerComponent {
             lname: felt252,
             alias: felt252,
             owner: ContractAddress,
+            factory: ContractAddress,
+            core_org: ContractAddress,
             // config: MemberConfig,
         ) {
             // This will be for making admins and giving people control/taking it away
@@ -310,6 +318,8 @@ pub mod MemberManagerComponent {
             // self.admins.entry(admin_count + 1).write(new_admin);
             self.member_count.write(self.member_count.read() + 1);
             self.admin_count.write(admin_count + 1);
+            self.factory.write(factory);
+            self.core_org.write(core_org);
         }
 
         fn get_role_value(self: @ComponentState<TContractState>, member_id: u256) -> u16 {

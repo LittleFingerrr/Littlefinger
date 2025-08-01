@@ -55,11 +55,15 @@ pub mod MockDaoController {
         member1: ContractAddress,
         member2: ContractAddress,
         member3: ContractAddress,
+        factory: ContractAddress,
+        core_org: ContractAddress,
     ) {
         self.dao_controller._initialize(admin, config, threshold);
         self
             .member_manager
-            ._initialize(first_admin_fname, first_admin_lname, first_admin_alias, admin);
+            ._initialize(
+                first_admin_fname, first_admin_lname, first_admin_alias, admin, factory, core_org,
+            );
         self
             .member_manager
             .add_member('Member1'.into(), 'LastName1'.into(), 'Alias1'.into(), 5, member1);

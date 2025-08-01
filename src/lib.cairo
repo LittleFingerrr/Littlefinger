@@ -40,4 +40,7 @@ pub mod tests {
         pub mod mock_disbursement;
         pub mod mock_member_manager;
     }
+    pub mod utils {
+        pub mod factory;
+    }
 }

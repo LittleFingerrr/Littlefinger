@@ -15,7 +15,9 @@ mod Core {
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::storage::StoragePointerWriteAccess;
-    use starknet::{ClassHash, ContractAddress, get_block_timestamp, get_caller_address};
+    use starknet::{
+        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
+    };
     use crate::interfaces::imember_manager::IMemberManager;
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -100,6 +102,7 @@ mod Core {
         first_admin_alias: felt252,
         deployer: ContractAddress,
         organization_type: u8,
+        factory: ContractAddress,
     ) { // owner
         self
             .organization
@@ -115,7 +118,16 @@ mod Core {
         // MemberManagerComponent::InternalImpl::_initialize(
         //     ref self.member, first_admin_fname, first_admin_lname, first_admin_alias
         // )
-        self.member._initialize(first_admin_fname, first_admin_lname, first_admin_alias, owner);
+        self
+            .member
+            ._initialize(
+                first_admin_fname,
+                first_admin_lname,
+                first_admin_alias,
+                owner,
+                factory,
+                get_contract_address(),
+            );
         self.vault_address.write(vault_address);
         self.disbursement._init(owner);
         // self.disbursement._add_authorized_caller(deployer);

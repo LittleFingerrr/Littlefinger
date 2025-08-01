@@ -1,8 +1,10 @@
+use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
 use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
 use littlefinger::structs::member_structs::{MemberRole, MemberRoleIntoU16, MemberStatus};
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
+use littlefinger::tests::utils::factory::setup_factory_and_org_helper;
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
     start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
@@ -14,7 +16,12 @@ fn deploy_mock_contract() -> IMemberManagerDispatcher {
     let (fname, lname, alias) = admin_details();
     let admin = admin();
     let contract_class = declare("MockMemberManager").unwrap().contract_class();
+    let (factory_address, _, core_org_address, _) = setup_factory_and_org_helper();
     let mut calldata = array![fname.into(), lname.into(), alias.into(), admin.into()];
+
+    factory_address.serialize(ref calldata);
+    core_org_address.serialize(ref calldata);
+
     let (contract_address, _) = contract_class.deploy(@calldata).unwrap();
     IMemberManagerDispatcher { contract_address }
 }
@@ -75,6 +82,31 @@ fn test_add_member_successful() {
     assert(member_response.alias == alias, 'Wrong alias');
     assert(MemberRoleIntoU16::into(member_response.role) == role, 'Wrong role');
     assert(member_response.address == member, 'Wrong address');
+}
+
+#[test]
+fn test_add_member_with_factory_and_core_org_successful() {
+    let mock_contract = deploy_mock_contract();
+
+    let (fname, lname, alias, role, member) = member_details();
+
+    let caller = caller();
+    let (factory_address, _, core_org_address, vault_address) = setup_factory_and_org_helper();
+
+    start_cheat_caller_address(mock_contract.contract_address, caller);
+    mock_contract.add_member(fname, lname, alias, role, member);
+
+    let member_response = mock_contract.get_member(2);
+    let factory_dispatch = IFactoryDispatcher { contract_address: factory_address };
+    let factory_get_vault_orgs_pairs = factory_dispatch.get_vault_org_pairs(1.try_into().unwrap());
+
+    stop_cheat_caller_address(mock_contract.contract_address);
+    assert(member_response.fname == fname, 'Wrong first name');
+    assert(member_response.lname == lname, 'Wrong last name');
+    assert(member_response.alias == alias, 'Wrong alias');
+    assert(MemberRoleIntoU16::into(member_response.role) == role, 'Wrong role');
+    assert(member_response.address == member, 'Wrong address');
+    assert((core_org_address, vault_address) == *factory_get_vault_orgs_pairs.at(0), 'Wrong pairs');
 }
 
 #[test]
