@@ -5,9 +5,9 @@ pub mod MemberManagerComponent {
     // use littlefinger::interfaces::icore::IConfig;
     use littlefinger::interfaces::imember_manager::IMemberManager;
     use littlefinger::structs::member_structs::{
-        InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails, MemberEnum,
-        MemberInvite, MemberInvited, InviteAccepted, MemberNode, MemberResponse, MemberRole, MemberStatus,
-        MemberTrait,
+        InviteAccepted, InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails,
+        MemberEnum, MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole,
+        MemberStatus, MemberTrait,
     };
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess, Vec, VecTrait,
@@ -246,10 +246,9 @@ pub mod MemberManagerComponent {
             member_node.no_of_payouts.write(0);
             self.member_count.write(self.member_count.read() + 1);
             invite.invite_status = InviteStatus::ACCEPTED;
-            let event = InviteAccepted {
-                address: caller,
-                timestamp: current_timestamp,
-            };
+            let factory_dispatcher = IFactoryDispatcher { contract_address: self.factory.read() };
+            factory_dispatcher.accpet_invite(caller);
+            let event = InviteAccepted { address: caller, timestamp: current_timestamp };
             self.emit(MemberEnum::InviteAccepted(event));
         }
 
@@ -280,6 +279,14 @@ pub mod MemberManagerComponent {
             member_node
                 .total_disbursements
                 .write(Option::Some(member_node.total_disbursements.read().unwrap() + 1));
+        }
+
+        fn get_factory_address(self: @ComponentState<TContractState>) -> ContractAddress {
+            self.factory.read()
+        }
+
+        fn get_core_org_address(self: @ComponentState<TContractState>) -> ContractAddress {
+            self.core_org.read()
         }
     }
 

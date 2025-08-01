@@ -1,5 +1,5 @@
-use starknet::{ClassHash, ContractAddress};
 use littlefinger::structs::member_structs::MemberInvite;
+use starknet::{ClassHash, ContractAddress};
 
 #[starknet::interface]
 pub trait IFactory<T> {
@@ -56,7 +56,14 @@ pub trait IFactory<T> {
     fn update_vault_hash(ref self: T, vault_hash: ClassHash);
     fn update_core_hash(ref self: T, core_hash: ClassHash);
     fn update_member_of(ref self: T, member: ContractAddress, org_core: ContractAddress);
-    fn create_invite(ref self: T, invitee: ContractAddress, invite_details: MemberInvite, core_org: ContractAddress);
+    fn create_invite(
+        ref self: T,
+        invitee: ContractAddress,
+        invite_details: MemberInvite,
+        core_org: ContractAddress,
+    );
+    fn accpet_invite(ref self: T, invitee: ContractAddress);
+    fn get_invite_details(self: @T, invitee: ContractAddress) -> MemberInvite;
     // fn get_vault_org_pairs(self: @T) -> Array<(ContractAddress, ContractAddress)>;
 
     // in the future, you can upgrade a deployed org core from here

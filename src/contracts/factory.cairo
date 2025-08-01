@@ -1,9 +1,9 @@
 #[starknet::contract]
 pub mod Factory {
     use littlefinger::interfaces::ifactory::IFactory;
-    use littlefinger::structs::member_structs::MemberInvite;
     // use littlefinger::structs::organization::{OrganizationInfo};
     use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
+    use littlefinger::structs::member_structs::{InviteStatus, MemberInvite};
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;
@@ -209,8 +209,27 @@ pub mod Factory {
             self.member_of.entry(member).push(org_core);
         }
 
-        fn create_invite(ref self: ContractState, invitee: ContractAddress, invite_details: MemberInvite, core_org: ContractAddress) {
+        fn create_invite(
+            ref self: ContractState,
+            invitee: ContractAddress,
+            invite_details: MemberInvite,
+            core_org: ContractAddress,
+        ) {
             self.org_invites.entry(invitee).write((core_org, invite_details));
+        }
+
+        fn accpet_invite(ref self: ContractState, invitee: ContractAddress) {
+            let (core_org, mut invite_details) = self.org_invites.entry(invitee).read();
+
+            invite_details.invite_status = InviteStatus::ACCEPTED;
+
+            self.org_invites.entry(invitee).write((core_org, invite_details));
+        }
+
+        fn get_invite_details(self: @ContractState, invitee: ContractAddress) -> MemberInvite {
+            let (_, invite_details) = self.org_invites.entry(invitee).read();
+
+            invite_details
         }
     }
 
