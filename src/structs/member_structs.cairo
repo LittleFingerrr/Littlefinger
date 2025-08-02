@@ -210,6 +210,12 @@ pub struct MemberInvited {
     pub timestamp: u64,
 }
 
+#[derive(Drop, starknet::Event)]
+pub struct InviteAccepted {
+    pub address: ContractAddress,
+    pub timestamp: u64,
+}
+
 #[derive(Drop, Serde, PartialEq, Default)]
 pub struct MemberConfig {
     // assign weight for each role, else use the into.
@@ -230,6 +236,7 @@ pub struct MemberConfigNode {}
 #[derive(Drop, starknet::Event)]
 pub enum MemberEnum {
     Invited: MemberInvited,
+    InviteAccepted: InviteAccepted,
     Added: MemberEvent,
     Removed: MemberEvent,
     Suspended: MemberEvent,

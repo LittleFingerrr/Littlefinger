@@ -44,6 +44,9 @@ pub trait IMemberManager<TContractState> {
     fn record_member_payment(
         ref self: TContractState, member_id: u256, amount: u256, timestamp: u64,
     );
+    fn get_factory_address(self: @TContractState) -> ContractAddress;
+
+    fn get_core_org_address(self: @TContractState) -> ContractAddress;
     // ROLE MANAGEMENT
 
     // ALLOCATION WEIGHT MANAGEMENT (PROMOTION & DEMOTION)

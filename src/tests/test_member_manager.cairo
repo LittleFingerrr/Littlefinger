@@ -1,13 +1,18 @@
+use littlefinger::components::member_manager::MemberManagerComponent;
 use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
 use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
-use littlefinger::structs::member_structs::{MemberRole, MemberRoleIntoU16, MemberStatus};
+use littlefinger::structs::member_structs::{
+    InviteAccepted, InviteStatus, MemberEnum, MemberInvite, MemberInvited, MemberRole,
+    MemberRoleIntoU16, MemberStatus,
+};
 use littlefinger::tests::mocks::mock_member_manager::MockMemberManager;
 use littlefinger::tests::utils::factory::setup_factory_and_org_helper;
 use snforge_std::{
-    ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
-    start_cheat_caller_address, stop_cheat_block_timestamp, stop_cheat_caller_address,
+    ContractClassTrait, DeclareResultTrait, EventSpyAssertionsTrait, declare, spy_events,
+    start_cheat_block_timestamp, start_cheat_caller_address, stop_cheat_block_timestamp,
+    stop_cheat_caller_address,
 };
 #[feature("deprecated-starknet-consts")]
 use starknet::{ContractAddress, contract_address_const};
@@ -284,16 +289,45 @@ fn test_invite_member_successful() {
     let mock_contract = deploy_mock_contract();
     let admin_addr = admin();
     let invitee_addr = member();
+    let mut spy = spy_events();
 
     start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     start_cheat_block_timestamp(mock_contract.contract_address, 1000);
 
     let result = mock_contract.invite_member(1, invitee_addr, 40000); // Employee role
+    let factory_address = mock_contract.get_factory_address();
+    let factory_dispatcher = IFactoryDispatcher { contract_address: factory_address };
+    let invite_details = factory_dispatcher.get_invite_details(invitee_addr);
+    let expected_invite_details = MemberInvite {
+        address: invitee_addr,
+        role: MemberRole::EMPLOYEE(1),
+        base_pay: 40000,
+        invite_status: InviteStatus::PENDING,
+        expiry: 1000 + 604800,
+    };
 
     stop_cheat_block_timestamp(mock_contract.contract_address);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     assert(result == 0, 'Invite should return 0');
+    assert(invite_details == expected_invite_details, 'Invalid invite details');
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    mock_contract.contract_address,
+                    MemberManagerComponent::Event::MemberEnum(
+                        MemberEnum::Invited(
+                            MemberInvited {
+                                address: invitee_addr,
+                                role: MemberRole::EMPLOYEE(1),
+                                timestamp: 1000,
+                            },
+                        ),
+                    ),
+                ),
+            ],
+        );
 }
 
 #[test]
@@ -329,6 +363,7 @@ fn test_accept_invite_successful() {
     let mock_contract = deploy_mock_contract();
     let admin_addr = admin();
     let invitee_addr = member();
+    let mut spy = spy_events();
 
     // Admin invites member
     start_cheat_caller_address(mock_contract.contract_address, admin_addr);
@@ -350,12 +385,31 @@ fn test_accept_invite_successful() {
 
     stop_cheat_caller_address(mock_contract.contract_address);
 
+    let factory_address = mock_contract.get_factory_address();
+    let factory_dispatcher = IFactoryDispatcher { contract_address: factory_address };
+    let invite_details = factory_dispatcher.get_invite_details(invitee_addr);
+
     assert(new_member.fname == 'John', 'Wrong fname');
     assert(new_member.status == MemberStatus::ACTIVE, 'Wrong status');
     assert(new_member.lname == 'Doe', 'Wrong lname');
     assert(new_member.alias == 'johndoe', 'Wrong alias');
     assert(new_member.role == MemberRole::EMPLOYEE(1), 'Wrong role');
     assert(new_member.address == invitee_addr, 'Wrong address');
+    assert(invite_details.invite_status == InviteStatus::ACCEPTED, 'Invite should be accepted');
+
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    mock_contract.contract_address,
+                    MemberManagerComponent::Event::MemberEnum(
+                        MemberEnum::InviteAccepted(
+                            InviteAccepted { address: invitee_addr, timestamp: 1100 },
+                        ),
+                    ),
+                ),
+            ],
+        );
 }
 
 
