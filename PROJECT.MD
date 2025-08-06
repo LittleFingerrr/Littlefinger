@@ -1,19 +1,18 @@
-## Project Structure
-
-(Leave this for Maintainers to change)
+# Project Structure
 
 Components in the project are as follows:
-- Disbursement Component
-- Member Manager Component
-- Organization Component
-<!-- - The Voting Component are not really needed for this  -->
+- Member Manager Component: This guides the addition, removal and general management of members
+- Disbursement Component: This guides the creation, deletion and management of payout schedules in the organization
+- Organization Component: This components is the core of the core, since it contains important components of the organization metadata,
+    the nature of the organization, etc.
+- DAO Controller: (Not in use yet) This is supposed to guide the creation, voting management and execution of proposals for the sake of decisions when the Decentralized setup is added for LittleFinger (what exists currently is a centralized setup)
 
 Contracts in the Project are as follows:
-- Organization Core Contract
-- Organization Vault Contract
-- Contract Factory
+- Organization Core Contract: This exposes the functions of the components abi(embed_v0), and puts together a couple of functions that need multiple components to act. It is famous for holding the ```schedule_payout``` function (which might be renamed to ```general_payout```)
+- Organization Vault Contract: This represents the vault of the organization. It is supposed to be used by the organization as their official recipient for business payments, and for approving payments to other entities as well(through the withdraw function). 
+- Contract Factory: This contract deploys a pair of the core and vault for use of an organization.
 
-### Flow
+## Flow
 ### Member Manager Component:
 This is embedded directly as ABI, as we need its functions to use directly when registering members, according to the contract.
 The abilities it gives us are as follows:
@@ -61,3 +60,17 @@ This is where we will deploy cases of the contract, using the class hash and stu
 - Initialize the member component - its initializer is writing the first admin. This means one of the steps on the frontend required in
 filling the form will be to register the first member of the organization.
 - No need to initialize the disburse component anyway, connect the vault with the organization
+
+## FUNCTION DOCUMENTATION
+
+### MEMBER_MANAGER COMPONENT
+
+### DISBURSEMENT COMPONENT
+
+### ORGANIZATION COMPONENT
+
+### CORE CONTRACT
+
+### VAULT CONTRACT
+
+### FACTORY CONTRACT
