@@ -162,6 +162,7 @@ fn setup_full_organization() -> (
     ContractAddress,
     IMockERC20Dispatcher,
     ContractAddress,
+    ContractAddress
 ) {
     let (token_dispatcher, token_address) = deploy_mock_erc20();
 
@@ -179,12 +180,13 @@ fn setup_full_organization() -> (
     let (factory_address, _) = factory_contract.deploy(@factory_calldata).unwrap();
     let factory_dispatcher = IFactoryDispatcher { contract_address: factory_address };
 
+    let owner = owner();
 
     let (core_address, vault_address) = factory_dispatcher
         .setup_org(
             token: token_address,
             salt: 'test_salt',
-            owner: owner(),
+            owner: owner,
             name: "Test Organization",
             ipfs_url: "test_ipfs_url",
             first_admin_fname: 'Admin',
@@ -199,7 +201,7 @@ fn setup_full_organization() -> (
 
 
     // Setup token approvals
-    start_cheat_caller_address(token_address, owner());
+    start_cheat_caller_address(token_address, owner);
     token_dispatcher.approve(vault_address, 10000000000000000000000);
     stop_cheat_caller_address(token_address);
 
@@ -210,13 +212,13 @@ fn setup_full_organization() -> (
 
 
     // Fund the vault
-    start_cheat_caller_address(vault_address, owner());
-    vault_dispatcher.deposit_funds(5000000000000000000000, owner()); 
-    vault_dispatcher.add_to_bonus_allocation(1000000000000000000000, owner()); 
+    start_cheat_caller_address(vault_address, owner);
+    vault_dispatcher.deposit_funds(5000000000000000000000, owner); 
+    vault_dispatcher.add_to_bonus_allocation(1000000000000000000000, owner); 
     stop_cheat_caller_address(vault_address);
 
 
-    (core_dispatcher, core_address, vault_dispatcher, vault_address, token_dispatcher, token_address)
+    (core_dispatcher, core_address, vault_dispatcher, vault_address, token_dispatcher, token_address, owner)
 }
 
 
@@ -317,14 +319,14 @@ fn add_test_members(core_dispatcher: ICoreDispatcher, core_address: ContractAddr
 // Test initialize_disbursement_schedule
 #[test]
 fn test_initialize_disbursement_schedule_success() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     
     let start_time = 1000000;
     let end_time = 2000000;
     let interval = 86400; 
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval); 
     stop_cheat_caller_address(core_address);
 
@@ -342,14 +344,14 @@ fn test_initialize_disbursement_schedule_success() {
 
 #[test]
 fn test_initialize_disbursement_schedule_onetime() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     
     let start_time = 1000000;
     let end_time = 2000000;
     let interval = 0; 
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.initialize_disbursement_schedule(1, start_time, end_time, interval); 
     stop_cheat_caller_address(core_address);
 
@@ -365,7 +367,7 @@ fn test_initialize_disbursement_schedule_onetime() {
 #[test]
 #[should_panic(expected: 'Payout has not started')]
 fn test_schedule_payout_before_start_time() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     add_test_members(core_dispatcher, core_address);
 
 
@@ -374,7 +376,7 @@ fn test_schedule_payout_before_start_time() {
     let interval = 86400;
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
 
@@ -382,7 +384,7 @@ fn test_schedule_payout_before_start_time() {
     start_cheat_block_timestamp(core_address, start_time - 100);
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
@@ -394,7 +396,7 @@ fn test_schedule_payout_before_start_time() {
 #[test]
 #[should_panic(expected: 'Payout period ended')]
 fn test_schedule_payout_after_end_time() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     add_test_members(core_dispatcher, core_address);
 
 
@@ -403,7 +405,7 @@ fn test_schedule_payout_after_end_time() {
     let interval = 86400;
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
 
@@ -411,7 +413,7 @@ fn test_schedule_payout_after_end_time() {
     start_cheat_block_timestamp(core_address, end_time + 100);
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
@@ -423,7 +425,7 @@ fn test_schedule_payout_after_end_time() {
 #[test]
 #[should_panic(expected: 'Schedule not active')]
 fn test_schedule_payout_with_paused_schedule() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     add_test_members(core_dispatcher, core_address);
 
 
@@ -432,7 +434,7 @@ fn test_schedule_payout_with_paused_schedule() {
     let interval = 86400;
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     
     let disbursement_dispatcher = IDisbursementDispatcher { contract_address: core_address };
@@ -443,7 +445,7 @@ fn test_schedule_payout_with_paused_schedule() {
     start_cheat_block_timestamp(core_address, start_time + 100);
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
 
@@ -455,16 +457,16 @@ fn test_schedule_payout_with_paused_schedule() {
 #[test]
 #[should_panic(expected: 'Payout period ended')]
 fn test_schedule_payout_at_end_timestamp() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     add_test_members(core_dispatcher, core_address);
     let start_time = 1000000;
     let end_time = 2000000;
     let interval = 86400;
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
     stop_cheat_caller_address(core_address);
     start_cheat_block_timestamp(core_address, end_time); 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.schedule_payout(); 
     stop_cheat_caller_address(core_address);
     stop_cheat_block_timestamp(core_address);
@@ -473,11 +475,52 @@ fn test_schedule_payout_at_end_timestamp() {
 #[test]
 #[should_panic(expected: 'No schedule set')]
 fn test_schedule_payout_inactive_schedule() {
-    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address) = setup_full_organization();
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
     add_test_members(core_dispatcher, core_address);
 
 
-    start_cheat_caller_address(core_address, owner());
+    start_cheat_caller_address(core_address, owner);
     core_dispatcher.schedule_payout();
     stop_cheat_caller_address(core_address);
+}
+
+#[test]
+fn test_schedule_payout_successful() {
+    let (core_dispatcher, core_address, _vault_dispatcher, _vault_address, _token_dispatcher, _token_address, owner) = setup_full_organization();
+    let member_dispatcher = IMemberManagerDispatcher { contract_address: core_address };
+    add_test_members(core_dispatcher, core_address);
+
+    start_cheat_caller_address(core_address, owner);
+    member_dispatcher.update_member_base_pay(1, 3000);
+    member_dispatcher.update_member_base_pay(2, 2000);
+    member_dispatcher.update_member_base_pay(3, 2000);
+    member_dispatcher.update_member_base_pay(4, 2000);
+    stop_cheat_caller_address(core_address);
+
+    let start_time = 2000000;
+    let end_time = 3000000;
+    let interval = 86400;
+    
+    
+    start_cheat_caller_address(core_address, owner);
+    core_dispatcher.initialize_disbursement_schedule(0, start_time, end_time, interval);
+    stop_cheat_caller_address(core_address);
+    
+    
+    start_cheat_block_timestamp(core_address, start_time);
+    
+    let owner_balance = _token_dispatcher.balance_of(owner);
+    let employee1_balance = _token_dispatcher.balance_of(employee1());
+
+    start_cheat_caller_address(core_address, owner);
+    core_dispatcher.schedule_payout();
+    stop_cheat_caller_address(core_address);
+
+    let new_employee1_balance = _token_dispatcher.balance_of(employee1());
+    let new_owner_balance = _token_dispatcher.balance_of(owner);
+
+    assert(new_employee1_balance > employee1_balance, 'Employee 1 payout unsuccessful');
+    assert(new_owner_balance > owner_balance, 'Owner is not paid out');
+
+    stop_cheat_block_timestamp(core_address);
 }
