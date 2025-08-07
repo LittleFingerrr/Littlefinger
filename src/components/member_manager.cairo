@@ -165,7 +165,7 @@ pub mod MemberManagerComponent {
         fn get_members(self: @ComponentState<TContractState>) -> Span<MemberResponse> {
             let member_count: u256 = self.member_count.read().into();
             let mut members: Array<MemberResponse> = array![];
-            for i in 1..member_count + 1 {
+            for i in 1..(member_count + 1) {
                 let m = self.members.entry(i);
                 let current_member = m.member.read();
                 members.append(current_member.to_response(m));
@@ -311,11 +311,11 @@ pub mod MemberManagerComponent {
             assert(!caller.is_zero(), 'Zero Address Caller');
 
             let reg_time = get_block_timestamp();
-            let role = MemberRole::ADMIN(0);
+            let role = MemberRole::ADMIN(11);
             // let (new_admin, details) = MemberTrait::with_details(
             //     id, fname, lname, status, role, alias, caller,
             // );
-            let new_admin = Member { id, address: caller, status: MemberStatus::ACTIVE, role };
+            let new_admin = Member { id, address: owner, status: MemberStatus::ACTIVE, role };
             let new_admin_details = MemberDetails { fname, lname, alias };
             // let new_admin = MemberTrait::new(id, fname, lname, role, alias, caller, reg_time);
 
@@ -325,6 +325,8 @@ pub mod MemberManagerComponent {
             new_admin_node.details.write(new_admin_details);
             new_admin_node.member.write(new_admin);
             new_admin_node.reg_time.write(reg_time);
+            new_admin_node.total_received.write(Option::Some(0));
+            new_admin_node.total_disbursements.write(Option::Some(0));
 
             self.admin_ca.entry(caller).write(true);
             self.admin_ca.entry(owner).write(true);

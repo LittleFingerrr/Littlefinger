@@ -197,8 +197,7 @@ mod Core {
                 let current_member_role = MemberRoleIntoU16::into(current_member.role);
                 total_weight += current_member_role;
             }
-            let mut i = 0;
-            while i < no_of_members {
+            for i in 0..no_of_members {
                 let current_member_response = *members.at(i);
                 // let pseudo_current_member = Member {
                 //     id: current_member_response.id,
@@ -214,7 +213,6 @@ mod Core {
                 vault_dispatcher.pay_member(current_member_response.address, amount);
 
                 // self.member.record_member_payment(current_member_response.id, amount, timestamp)
-                i += 1;
             }
 
             self.disbursement.update_current_schedule_last_execution(now);

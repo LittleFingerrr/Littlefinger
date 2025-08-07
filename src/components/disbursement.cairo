@@ -197,7 +197,10 @@ pub mod DisbursementComponent {
 
         fn _assert_caller(ref self: ComponentState<TContractState>) {
             let caller = get_caller_address();
-            assert(self.authorized_callers.entry(caller).read(), 'Caller Not Permitted');
+            assert(
+                self.authorized_callers.entry(caller).read() || caller == self.owner.read(), 
+                'Caller Not Permitted'
+            );
         }
 
         fn _delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
