@@ -211,7 +211,6 @@ mod Core {
                     .compute_renumeration(current_member_response, total_bonus, total_weight);
                 let timestamp = get_block_timestamp();
                 vault_dispatcher.pay_member(current_member_response.address, amount);
-
                 // self.member.record_member_payment(current_member_response.id, amount, timestamp)
             }
 
