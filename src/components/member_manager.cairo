@@ -1,9 +1,13 @@
-/// # MemberManagerComponent
+/// ## A Starknet component responsible for managing the members of an organization.
 ///
-/// A Starknet component responsible for managing the members of an organization.
-/// This component handles member registration, role assignment, status updates,
-/// invitations, and profile management. It interacts with a factory contract
-/// to coordinate state across a broader system.
+/// This component handles:
+/// - Member registration
+/// - Role assignment
+/// - Status updates
+/// - Invitations
+/// - Profile management
+///
+/// It also interacts with a factory contract to coordinate state across a broader system.
 #[starknet::component]
 pub mod MemberManagerComponent {
     use core::num::traits::Zero;
@@ -20,66 +24,61 @@ pub mod MemberManagerComponent {
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
 
-    /// # Storage
-    ///
-    /// Defines the storage layout for the MemberManagerComponent.
+    /// Defines the storage layout for the `MemberManagerComponent`.
     #[storage]
     pub struct Storage {
-        /// @notice The total number of administrators in the organization.
+        /// The total number of administrators in the organization.
         pub admin_count: u64,
-        /// @notice A mapping from a contract address to a boolean indicating admin status.
-        /// Used for quick verification of admin privileges.
+
+        /// Maps a contract address to a boolean indicating admin status.
         pub admin_ca: Map<ContractAddress, bool>,
-        /// @notice A mapping from a unique member ID (u256) to the member's data node
-        /// (`MemberNode`).
+
+        /// Maps a unique member ID (`u256`) to a `MemberNode`.
         pub members: Map<u256, MemberNode>,
-        /// @notice A counter for the total number of members, also used to generate new member IDs.
+
+        /// Counter for the total number of members.
         pub member_count: u256,
-        /// @notice A vector of weights or values associated with different role types.
-        /// Likely used for governance or weighted calculations.
+
+        /// Role value weights for governance or weighted calculations.
         pub role_value: Vec<u16>,
-        /// @notice A storage node for member-related configurations.
+
+        /// Member configuration node.
         pub config: MemberConfigNode,
-        /// @notice A mapping from a potential member's address to their invitation details
-        /// (`MemberInvite`).
+
+        /// Maps member addresses to their invite details.
         pub member_invites: Map<ContractAddress, MemberInvite>,
-        /// @notice The address of the associated factory contract.
+
+        /// Address of the associated factory contract.
         pub factory: ContractAddress,
-        /// @notice The address of the core organization contract this component is a part of.
+
+        /// Address of the core organization contract.
         pub core_org: ContractAddress,
     }
 
-    /// # Event
-    ///
-    /// Defines the events that can be emitted by the MemberManagerComponent.
+    /// Events emitted by the `MemberManagerComponent`.
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
-        /// @notice An enum for emitting various member-related events.
+        /// Emits member-related events.
         #[flat]
         MemberEnum: MemberEnum,
     }
 
     /// # MemberManagerImpl
     ///
-    /// Implementation of the `IMemberManager` trait, providing the public-facing
-    /// functions for managing members.
+    /// Public-facing implementation of the `IMemberManager` interface.
     #[embeddable_as(MemberManager)]
     pub impl MemberManagerImpl<
         TContractState, +HasComponent<TContractState>,
     > of IMemberManager<ComponentState<TContractState>> {
-        /// # add_member
+        /// Adds a new member to the organization.
         ///
-        /// Adds a new member directly to the organization. This is an administrative function.
-        /// It creates a new member with the specified details and role, and updates the factory
-        /// contract.
-        ///
-        /// @param self The component's state.
-        /// @param fname The first name of the member.
-        /// @param lname The last name of the member.
-        /// @param alias An alias or username for the member.
-        /// @param role A numerical representation of the member's role (0-14).
-        /// @param address The Starknet address of the new member.
+        /// ### Parameters
+        /// - `fname`: First name of the member
+        /// - `lname`: Last name of the member
+        /// - `alias`: Username or alias
+        /// - `role`: Role code (0–14)
+        /// - `address`: Starknet address of the new member
         fn add_member(
             ref self: ComponentState<TContractState>,
             fname: felt252,
@@ -123,13 +122,10 @@ pub mod MemberManagerComponent {
             factory_dispatcher.update_member_of(address, self.core_org.read());
         }
 
-        /// # add_admin
+        /// Promotes an existing member to admin.
         ///
-        /// Promotes an existing member to an administrator role.
-        /// The caller must be an existing admin to execute this function.
-        ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member to be promoted.
+        /// ### Parameters
+        /// - `member_id`: ID of the member to promote
         fn add_admin(ref self: ComponentState<TContractState>, member_id: u256) {
             let caller = get_caller_address();
             assert(self.admin_ca.entry(caller).read(), 'Caller Not an Admin');
@@ -147,16 +143,11 @@ pub mod MemberManagerComponent {
             // EMIT THE EVENT HERE
         }
 
-        /// # update_member_details
+        /// Updates a member's profile details.
         ///
-        /// Allows a member to update their own profile details (first name, last name, alias).
-        /// The caller must be the member themselves, verified by `member.verify`.
-        ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member whose details are to be updated.
-        /// @param fname An optional new first name.
-        /// @param lname An optional new last name.
-        /// @param alias An optional new alias.
+        /// ### Parameters
+        /// - `member_id`: ID of the member
+        /// - `fname`, `lname`, `alias`: Optional new values
         fn update_member_details(
             ref self: ComponentState<TContractState>,
             member_id: u256,
@@ -186,14 +177,11 @@ pub mod MemberManagerComponent {
             m.details.write(details);
         }
 
-        /// # update_member_base_pay
+        /// Updates the base pay for a member.
         ///
-        /// Updates the base pay for a specific member.
-        /// This is an administrative function and requires the caller to be an admin.
-        ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member to update.
-        /// @param base_pay The new base pay amount.
+        /// ### Parameters
+        /// - `member_id`: ID of the member
+        /// - `base_pay`: New base pay amount
         fn update_member_base_pay(
             ref self: ComponentState<TContractState>, member_id: u256, base_pay: u256,
         ) {
@@ -207,25 +195,23 @@ pub mod MemberManagerComponent {
             member_node.base_pay.write(base_pay);
         }
 
-        /// # get_member_base_pay
+        /// Returns a member's base pay.
         ///
-        /// Retrieves the base pay for a specific member.
+        /// ### Parameters
+        /// - `member_id`: ID of the member
         ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member.
-        /// @return The base pay of the member.
+        /// ### Returns
+        /// - `u256`: Base pay amount
         fn get_member_base_pay(ref self: ComponentState<TContractState>, member_id: u256) -> u256 {
             let member_node = self.members.entry(member_id);
             let member_base_pay = member_node.base_pay.read();
             member_base_pay
         }
 
-        /// # suspend_member
+        /// Suspends a member.
         ///
-        /// Sets a member's status to `SUSPENDED`.
-        ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member to suspend.
+        /// ### Parameters
+        /// - `member_id`: ID of the member
         fn suspend_member(
             ref self: ComponentState<TContractState>,
             member_id: u256 // suspension_duration: u64 //block timestamp operation
@@ -236,25 +222,20 @@ pub mod MemberManagerComponent {
             m.member.write(member);
         }
 
-        /// # reinstate_member
+        /// Reinstates a suspended member.
         ///
-        /// Reinstates a suspended member, setting their status to `ACTIVE`.
-        ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member to reinstate.
+        /// ### Parameters
+        /// - `member_id`: ID of the member
         fn reinstate_member(ref self: ComponentState<TContractState>, member_id: u256) {
             let mut member = self.members.entry(member_id).member.read();
             member.reinstate();
             self.members.entry(member_id).member.write(member);
         }
 
-        /// # get_members
+        /// Returns all members in the organization.
         ///
-        /// Retrieves a list of all members in the organization by iterating
-        /// from the first member ID up to the current `member_count`.
-        ///
-        /// @param self The component's state.
-        /// @return A `Span` containing `MemberResponse` structs for all members.
+        /// ### Returns
+        /// - `Span<MemberResponse>`: List of member data
         fn get_members(self: @ComponentState<TContractState>) -> Span<MemberResponse> {
             let member_count: u256 = self.member_count.read().into();
             let mut members: Array<MemberResponse> = array![];
@@ -267,17 +248,15 @@ pub mod MemberManagerComponent {
             members.span()
         }
 
-        /// # invite_member
+        /// Creates an invitation for a new member.
         ///
-        /// Creates an invitation for a new member. The invitation is sent to a specific address
-        /// and has an expiration of one week. This is an admin-only function.
+        /// ### Parameters
+        /// - `role`: Role code (0: Contractor, 1: Employee, 2: Admin)
+        /// - `address`: Invitee's Starknet address
+        /// - `renumeration`: Base pay offered
         ///
-        /// @param self The component's state.
-        /// @param role The role to be assigned upon acceptance (0: Contractor, 1: Employee, 2:
-        /// Admin).
-        /// @param address The address of the person being invited.
-        /// @param renumeration The base pay offered in the invitation.
-        /// @return A felt252 value (currently 0, used for status).
+        /// ### Returns
+        /// - `felt252`: Currently always 0
         fn invite_member(
             ref self: ComponentState<TContractState>,
             role: u16, // 0 means contractor, 1 means employee, 2 means admin
@@ -321,16 +300,12 @@ pub mod MemberManagerComponent {
             0
         }
 
-        /// # accept_invite
+        /// Accepts an invitation and registers as a member.
         ///
-        /// Called by an invited individual to accept their invitation and become a member.
-        /// The caller's address must match a pending and unexpired invitation.
-        /// On acceptance, a new member is created and the invitation status is updated.
-        ///
-        /// @param self The component's state.
-        /// @param fname The first name of the accepting member.
-        /// @param lname The last name of the accepting member.
-        /// @param alias An alias for the accepting member.
+        /// ### Parameters
+        /// - `fname`: First name
+        /// - `lname`: Last name
+        /// - `alias`: Alias or username
         fn accept_invite(
             ref self: ComponentState<TContractState>,
             fname: felt252,
@@ -366,13 +341,13 @@ pub mod MemberManagerComponent {
             self.emit(MemberEnum::InviteAccepted(event));
         }
 
-        /// # get_member
+        /// Retrieves details of a specific member.
         ///
-        /// Retrieves the full details of a single member in a response format.
+        /// ### Parameters
+        /// - `member_id`: ID of the member
         ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member to retrieve.
-        /// @return A `MemberResponse` struct containing the member's public data.
+        /// ### Returns
+        /// - `MemberResponse`: Member information
         fn get_member(self: @ComponentState<TContractState>, member_id: u256) -> MemberResponse {
             let member_ref = self.members.entry(member_id);
             let member = member_ref.member.read();
@@ -387,24 +362,17 @@ pub mod MemberManagerComponent {
 
         // }
 
-        /// # update_member_config
+        /// Updates the member config.
         ///
-        /// Placeholder function intended to update member-related configurations. Currently not
-        /// implemented.
-        ///
-        /// @param self The component's state.
-        /// @param config The new member configuration.
+        /// **Note:** Not yet implemented.
         fn update_member_config(ref self: ComponentState<TContractState>, config: MemberConfig) {}
 
-        /// # record_member_payment
+        /// Records a payment to a member.
         ///
-        /// Records that a payment has been made to a member, updating their payment statistics,
-        /// including total received, number of payouts, and last disbursement timestamp.
-        ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member who received the payment.
-        /// @param amount The amount of the payment.
-        /// @param timestamp The timestamp of the payment.
+        /// ### Parameters
+        /// - `member_id`: Member ID
+        /// - `amount`: Payment amount
+        /// - `timestamp`: Time of payment
         fn record_member_payment(
             ref self: ComponentState<TContractState>, member_id: u256, amount: u256, timestamp: u64,
         ) {
@@ -419,22 +387,12 @@ pub mod MemberManagerComponent {
                 .write(Option::Some(member_node.total_disbursements.read().unwrap() + 1));
         }
 
-        /// # get_factory_address
-        ///
-        /// Retrieves the address of the associated factory contract.
-        ///
-        /// @param self The component's state.
-        /// @return The `ContractAddress` of the factory.
+        /// Returns the address of the factory contract.
         fn get_factory_address(self: @ComponentState<TContractState>) -> ContractAddress {
             self.factory.read()
         }
 
-        /// # get_core_org_address
-        ///
-        /// Retrieves the address of the core organization contract.
-        ///
-        /// @param self The component's state.
-        /// @return The `ContractAddress` of the core organization.
+        /// Returns the address of the core organization.
         fn get_core_org_address(self: @ComponentState<TContractState>) -> ContractAddress {
             self.core_org.read()
         }
@@ -442,25 +400,18 @@ pub mod MemberManagerComponent {
 
     /// # InternalImpl
     ///
-    /// Contains internal functions for the component, for initialization
-    /// and privileged, non-public operations.
+    /// Internal functions for initialization and privileged operations.
     #[generate_trait]
     pub impl InternalImpl<
         TContractState, +HasComponent<TContractState>,
     > of MemberInternalTrait<TContractState> {
-        /// # _initialize
+        /// Initializes the component with the first admin and core addresses.
         ///
-        /// Initializes the MemberManagerComponent, setting up the first administrator and
-        /// essential contract addresses. This function is designed to be called only once
-        /// during the initial deployment of the contract.
-        ///
-        /// @param self The component's state.
-        /// @param fname The first name of the initial admin.
-        /// @param lname The last name of the initial admin.
-        /// @param alias An alias for the initial admin.
-        /// @param owner The address that will own the initial admin member.
-        /// @param factory The address of the factory contract.
-        /// @param core_org The address of the core organization contract.
+        /// ### Parameters
+        /// - `fname`, `lname`, `alias`: First admin's details
+        /// - `owner`: Address of the first admin
+        /// - `factory`: Factory contract address
+        /// - `core_org`: Core org contract address
         fn _initialize(
             ref self: ComponentState<TContractState>,
             fname: felt252,
@@ -505,15 +456,13 @@ pub mod MemberManagerComponent {
             self.core_org.write(core_org);
         }
 
-        /// # get_role_value
+        /// Returns the weighted role value of a member.
         ///
-        /// Calculates a weighted value for a member's role based on their specific
-        /// role level and the base value for that role type (Contractor, Employee, Admin).
+        /// ### Parameters
+        /// - `member_id`: Member ID
         ///
-        /// @param self The component's state.
-        /// @param member_id The ID of the member.
-        /// @return A `u16` representing the calculated role value. Returns 0 for invalid members or
-        /// roles.
+        /// ### Returns
+        /// - `u16`: Calculated role weight
         fn get_role_value(self: @ComponentState<TContractState>, member_id: u256) -> u16 {
             // read member node
             let role = self.members.entry(member_id).member.read().role;
@@ -526,13 +475,9 @@ pub mod MemberManagerComponent {
             }
         }
 
-        /// # assert_admin
+         /// Asserts the caller is an admin.
         ///
-        /// A helper function that asserts whether the current caller is an administrator.
-        /// It will revert the transaction with 'UNAUTHORIZED' if the caller is not an admin.
-        /// This is used as a security check in privileged functions.
-        ///
-        /// @param self The component's state.
+        /// Reverts with `"UNAUTHORIZED"` if not.
         fn assert_admin(self: @ComponentState<TContractState>) {
             let caller = get_caller_address();
             assert(self.admin_ca.entry(caller).read(), 'UNAUTHORIZED');
