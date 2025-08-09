@@ -1,3 +1,15 @@
+/// ## A Starknet contract that serves as a factory for deploying organizations.
+///
+/// This factory contract handles the creation of entire organizational structures,
+/// each comprising a `Core` contract and a `Vault` contract.
+///
+/// This contract is responsible for:
+/// - Deploying new `Vault` and `Core` contracts using predefined class hashes.
+/// - Linking each `Core` contract to its corresponding `Vault`.
+/// - Maintaining a registry of all deployed organizations and their owners.
+/// - Storing updatable class hashes to allow for future upgrades of the `Core` and `Vault` logic.
+/// - Acting as a central lookup service for cross-organization data, such as memberships and
+/// invitations.
 #[starknet::contract]
 pub mod Factory {
     use littlefinger::interfaces::ifactory::IFactory;
@@ -21,19 +33,31 @@ pub mod Factory {
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
 
+    /// Defines the storage layout for the `Factory` contract.
     #[storage]
     pub struct Storage {
+        /// Maps an organization's ID to its deployed `Core` contract address.
         deployed_orgs: Map<u256, ContractAddress>, //org_id should be the same with vault_id
+        /// Maps a vault's ID to its deployed `Vault` contract address.
         deployed_vaults: Map<u256, ContractAddress>,
+        /// Maps an owner's address to a list of their associated (Core, Vault) contract pairs.
         vault_org_pairs: Map<ContractAddress, Vec<(ContractAddress, ContractAddress)>>,
+        /// Maps a member's address to a list of organizations they belong to.
         member_of: Map<ContractAddress, Vec<ContractAddress>>,
+        /// Maps an invitee's address to their invitation details and the inviting organization.
         org_invites: Map<ContractAddress, (ContractAddress, MemberInvite)>,
+        /// Counter for the total number of deployed organizations.
         orgs_count: u64,
+        /// Counter for the total number of deployed vaults.
         vaults_count: u64, //Open to the possibility of an organization somehow having more than one vault
+        /// The current `ClassHash` for deploying new `Vault` contracts.
         vault_class_hash: ClassHash,
+        /// The current `ClassHash` for deploying new `Core` contracts.
         org_core_class_hash: ClassHash,
+        /// Substorage for the Ownable component.
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        /// Substorage for the Upgradeable component.
         #[substorage(v0)]
         upgradeable: UpgradeableComponent::Storage,
     }
@@ -50,29 +74,42 @@ pub mod Factory {
     // const VAULT_CLASS_HASH: felt252 =
     // 0x017195343b9bf99c3933a7a998bcba8244d14a95ec35d26afbbfa6bbe4cded8d;
 
+    /// Events emitted by the `Factory` contract.
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
+        /// Emits ownable-related events.
         #[flat]
         OwnableEvent: OwnableComponent::Event,
+        /// Emits upgradeable-related events.
         #[flat]
         UpgradeableEvent: UpgradeableComponent::Event,
+        /// Emitted when a new vault is deployed.
         VaultDeployed: VaultDeployed,
+        /// Emitted when a new core organization contract is deployed.
         OrgCoreDeployed: OrgCoreDeployed,
     }
 
+    /// Event data for a vault deployment.
     #[derive(Drop, starknet::Event)]
     pub struct VaultDeployed {
-        address: ContractAddress,
-        deployed_at: u64,
+        pub address: ContractAddress,
+        pub deployed_at: u64,
     }
 
+    /// Event data for a core organization contract deployment.
     #[derive(Drop, starknet::Event)]
     pub struct OrgCoreDeployed {
-        address: ContractAddress,
-        deployed_at: u64,
+        pub address: ContractAddress,
+        pub deployed_at: u64,
     }
 
+    /// Initializes the Factory contract.
+    ///
+    /// ### Parameters
+    /// - `owner`: The address that will have ownership of the factory.
+    /// - `org_core_class_hash`: The initial class hash for the `Core` contract.
+    /// - `vault_class_hash`: The initial class hash for the `Vault` contract.
     #[constructor]
     fn constructor(
         ref self: ContractState,
@@ -91,6 +128,13 @@ pub mod Factory {
 
     #[abi(embed_v0)]
     impl UpgradeableImpl of IUpgradeable<ContractState> {
+        /// Upgrades the factory contract to a new class hash.
+        ///
+        /// ### Parameters
+        /// - `new_class_hash`: The class hash of the new contract implementation.
+        ///
+        /// ### Panics
+        /// - If the caller is not the owner.
         fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
             // This might be upgraded from the factory
             self.ownable.assert_only_owner();
@@ -98,8 +142,24 @@ pub mod Factory {
         }
     }
 
+    /// # FactoryImpl
+    ///
+    /// Public-facing implementation of the `IFactory` interface.
     #[abi(embed_v0)]
     pub impl FactoryImpl of IFactory<ContractState> {
+        /// Deploys a new organization, consisting of a Vault and a Core contract.
+        ///
+        /// ### Parameters
+        /// - `token`: The ERC20 token address for the vault.
+        /// - `salt`: A unique value for deterministic deployment.
+        /// - `owner`: The owner of the new organization.
+        /// - `name`, `ipfs_url`: Metadata for the organization.
+        /// - `first_admin_fname`, `first_admin_lname`, `first_admin_alias`: Details for the initial
+        /// admin.
+        /// - `organization_type`: A numerical identifier for the organization type.
+        ///
+        /// ### Returns
+        /// - A tuple `(ContractAddress, ContractAddress)` with the new Core and Vault addresses.
         fn setup_org(
             ref self: ContractState,
             token: ContractAddress,
@@ -140,6 +200,10 @@ pub mod Factory {
             (org_core_address, vault_address)
         }
 
+        /// Returns a list of all deployed vault addresses.
+        ///
+        /// ### Returns
+        /// - `Array<ContractAddress>`: A list of vault contract addresses.
         fn get_deployed_vaults(self: @ContractState) -> Array<ContractAddress> {
             let mut vaults = array![];
             let vaults_count: u256 = (self.vaults_count.read()).try_into().unwrap();
@@ -150,6 +214,11 @@ pub mod Factory {
             }
             vaults
         }
+
+        /// Returns a list of all deployed core organization addresses.
+        ///
+        /// ### Returns
+        /// - `Array<ContractAddress>`: A list of core contract addresses.
         fn get_deployed_org_cores(self: @ContractState) -> Array<ContractAddress> {
             let mut orgs = array![];
             let orgs_count: u256 = (self.orgs_count.read()).try_into().unwrap();
@@ -161,16 +230,37 @@ pub mod Factory {
             orgs
         }
 
+        /// Updates the class hash for new Vault deployments.
+        ///
+        /// ### Parameters
+        /// - `vault_hash`: The new `ClassHash` for the Vault contract.
+        ///
+        /// ### Panics
+        /// - If the caller is not the owner.
         fn update_vault_hash(ref self: ContractState, vault_hash: ClassHash) {
             self.ownable.assert_only_owner();
             self.vault_class_hash.write(vault_hash);
         }
 
+        /// Updates the class hash for new Core deployments.
+        ///
+        /// ### Parameters
+        /// - `core_hash`: The new `ClassHash` for the Core contract.
+        ///
+        /// ### Panics
+        /// - If the caller is not the owner.
         fn update_core_hash(ref self: ContractState, core_hash: ClassHash) {
             self.ownable.assert_only_owner();
             self.org_core_class_hash.write(core_hash);
         }
 
+        /// Returns all (Core, Vault) pairs for a given owner.
+        ///
+        /// ### Parameters
+        /// - `caller`: The address of the owner.
+        ///
+        /// ### Returns
+        /// - `Array<(ContractAddress, ContractAddress)>`: A list of associated contract pairs.
         fn get_vault_org_pairs(
             self: @ContractState, caller: ContractAddress,
         ) -> Array<(ContractAddress, ContractAddress)> {
@@ -187,6 +277,13 @@ pub mod Factory {
             vault_org_pairs
         }
 
+        /// Returns all organizations a given address is a member of.
+        ///
+        /// ### Parameters
+        /// - `caller`: The address of the member.
+        ///
+        /// ### Returns
+        /// - `Array<ContractAddress>`: A list of Core contracts the user is a member of.
         fn get_member_orgs(
             self: @ContractState, caller: ContractAddress,
         ) -> Array<ContractAddress> {
@@ -203,12 +300,23 @@ pub mod Factory {
             orgs
         }
 
+        /// Adds a record indicating that a user is a member of an organization.
+        ///
+        /// ### Parameters
+        /// - `member`: The address of the new member.
+        /// - `org_core`: The address of the organization they joined.
         fn update_member_of(
             ref self: ContractState, member: ContractAddress, org_core: ContractAddress,
         ) {
             self.member_of.entry(member).push(org_core);
         }
 
+        /// Stores invitation details in the central factory registry.
+        ///
+        /// ### Parameters
+        /// - `invitee`: The address of the user being invited.
+        /// - `invite_details`: The details of the invitation.
+        /// - `core_org`: The address of the inviting organization.
         fn create_invite(
             ref self: ContractState,
             invitee: ContractAddress,
@@ -218,6 +326,10 @@ pub mod Factory {
             self.org_invites.entry(invitee).write((core_org, invite_details));
         }
 
+        /// Updates an invitation's status to `ACCEPTED` in the factory registry.
+        ///
+        /// ### Parameters
+        /// - `invitee`: The address of the user who accepted the invitation.
         fn accpet_invite(ref self: ContractState, invitee: ContractAddress) {
             let (core_org, mut invite_details) = self.org_invites.entry(invitee).read();
 
@@ -226,6 +338,13 @@ pub mod Factory {
             self.org_invites.entry(invitee).write((core_org, invite_details));
         }
 
+        /// Retrieves the details for a specific invitation.
+        ///
+        /// ### Parameters
+        /// - `invitee`: The address of the user whose invitation is being requested.
+        ///
+        /// ### Returns
+        /// - `MemberInvite`: A struct containing the invitation details.
         fn get_invite_details(self: @ContractState, invitee: ContractAddress) -> MemberInvite {
             let (_, invite_details) = self.org_invites.entry(invitee).read();
 
@@ -233,8 +352,20 @@ pub mod Factory {
         }
     }
 
+    /// # InternalImpl
+    ///
+    /// Internal functions for contract deployment, not exposed in the public ABI.
     #[generate_trait]
     pub impl InternalImpl of InternalTrait {
+        /// Deploys a new Vault contract.
+        ///
+        /// ### Parameters
+        /// - `token`: The ERC20 token the vault will manage.
+        /// - `salt`: A unique value for deterministic deployment.
+        /// - `owner`: The owner of the new vault.
+        ///
+        /// ### Returns
+        /// - `ContractAddress`: The address of the newly deployed vault.
         fn deploy_vault(
             ref self: ContractState, // class_hash: felt252, //unwrap it into class has using into, and it will be removed
             // once I declare the vault
@@ -273,6 +404,20 @@ pub mod Factory {
         // Initialize member
         // If custom owner is not supplied at deployment, deployer is used as owner, and becomes the
         // first admin
+        /// Deploys a new Core organization contract.
+        ///
+        /// ### Parameters
+        /// - `owner`: The owner of the new organization.
+        /// - `name`, `ipfs_url`: Metadata for the organization.
+        /// - `vault_address`: The address of the associated vault.
+        /// - `first_admin_fname`, `first_admin_lname`, `first_admin_alias`: Details for the initial
+        /// admin.
+        /// - `salt`: A unique value for deterministic deployment.
+        /// - `organization_type`: A numerical identifier for the organization type.
+        /// - `factory`: The address of this factory contract.
+        ///
+        /// ### Returns
+        /// - `ContractAddress`: The address of the newly deployed Core contract.
         fn deploy_org_core(
             ref self: ContractState,
             // class_hash: felt252,
