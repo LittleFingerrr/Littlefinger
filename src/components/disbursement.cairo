@@ -1,3 +1,13 @@
+/// ## A Starknet component for managing payroll and disbursement schedules.
+///
+/// This component handles the logic for:
+/// - Creating, pausing, and resuming payment schedules.
+/// - Storing a history of past schedules.
+/// - Calculating individual member payments based on base pay and a weighted share of bonuses.
+/// - Tracking the timing of disbursement cycles.
+///
+/// It is intended to be integrated into a `Core` contract to manage an organization's payroll
+/// system.
 #[starknet::component]
 pub mod DisbursementComponent {
     use littlefinger::interfaces::idisbursement::IDisbursement;
@@ -10,23 +20,41 @@ pub mod DisbursementComponent {
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
 
+    /// Defines the storage layout for the `DisbursementComponent`.
     #[storage]
     pub struct Storage {
+        /// Maps an address to a boolean indicating if it is authorized to call privileged
+        /// functions.
         authorized_callers: Map<ContractAddress, bool>,
+        /// The address of the component's owner.
         owner: ContractAddress,
+        /// Maps a schedule ID to an archived `DisbursementSchedule`.
         previous_schedules: Map<u64, DisbursementSchedule>, // only one active schedule at a time
+        /// The currently active disbursement schedule for the organization.
         current_schedule: DisbursementSchedule,
+        /// Maps a disbursement ID to a `UnitDisbursement` struct for tracking failed payments.
         failed_disbursements: Map<
             u256, UnitDisbursement,
         >, //map disbursement id to a failed disbursement
+        /// A counter for the total number of schedules created.
         schedules_count: u64,
     }
 
+    /// # DisbursementManager
+    ///
+    /// Public-facing implementation of the `IDisbursement` interface.
     #[embeddable_as(DisbursementManager)]
     pub impl DisbursementImpl<
         TContractState, +HasComponent<TContractState> //, +Drop<TContractState>,
         //impl Member: MemberManagerComponent::HasComponent<TContractState>,
     > of IDisbursement<ComponentState<TContractState>> {
+        /// Creates and activates a new disbursement schedule.
+        ///
+        /// ### Parameters
+        /// - `schedule_type`: Type of schedule (0: Recurring, 1: One-Time).
+        /// - `start`: Unix timestamp for the schedule's start time.
+        /// - `end`: Unix timestamp for the schedule's end time.
+        /// - `interval`: Payout interval in seconds.
         fn create_disbursement_schedule(
             ref self: ComponentState<TContractState>,
             schedule_type: u8,
@@ -57,6 +85,7 @@ pub mod DisbursementComponent {
             self.current_schedule.write(new_disbursement_schedule);
         }
 
+        /// Pauses the currently active disbursement schedule.
         fn pause_disbursement(ref self: ComponentState<TContractState>) {
             self._assert_caller();
             let mut disbursement_schedule = self.current_schedule.read();
@@ -68,6 +97,7 @@ pub mod DisbursementComponent {
             self.current_schedule.write(disbursement_schedule);
         }
 
+        /// Resumes a paused disbursement schedule.
         fn resume_schedule(ref self: ComponentState<TContractState>) {
             self._assert_caller();
             let mut disbursement_schedule = self.current_schedule.read();
@@ -91,6 +121,10 @@ pub mod DisbursementComponent {
         //     true
         // }
 
+        /// Updates the `last_execution` timestamp for the active schedule.
+        ///
+        /// ### Parameters
+        /// - `timestamp`: The Unix timestamp of the last successful execution.
         fn update_current_schedule_last_execution(
             ref self: ComponentState<TContractState>, timestamp: u64,
         ) {
@@ -100,6 +134,10 @@ pub mod DisbursementComponent {
             self.current_schedule.write(current_schedule);
         }
 
+        /// Sets an archived schedule as the new active one.
+        ///
+        /// ### Parameters
+        /// - `schedule_id`: The ID of the schedule to activate.
         fn set_current_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
             self._assert_caller();
             let schedule = self.previous_schedules.entry(schedule_id).read();
@@ -107,12 +145,20 @@ pub mod DisbursementComponent {
             self.current_schedule.write(schedule);
         }
 
+        /// Returns the details of the currently active schedule.
+        ///
+        /// ### Returns
+        /// - `DisbursementSchedule`: A struct containing the active schedule's details.
         fn get_current_schedule(self: @ComponentState<TContractState>) -> DisbursementSchedule {
             let disbursement_schedule = self.current_schedule.read();
             assert(disbursement_schedule != Default::default(), 'No schedule set');
             disbursement_schedule
         }
 
+        /// Returns a list of all historical and current schedules.
+        ///
+        /// ### Returns
+        /// - `Array<DisbursementSchedule>`: An array of all non-deleted schedules.
         fn get_disbursement_schedules(
             self: @ComponentState<TContractState>,
         ) -> Array<DisbursementSchedule> {
@@ -131,6 +177,15 @@ pub mod DisbursementComponent {
             disbursement_schedules_array
         }
 
+        /// Calculates the total payment for a member for one cycle.
+        ///
+        /// ### Parameters
+        /// - `member`: The details of the member.
+        /// - `total_bonus_available`: The total bonus pool for the cycle.
+        /// - `total_members_weight`: The sum of role weights for all members.
+        ///
+        /// ### Returns
+        /// - `u256`: The calculated total remuneration.
         fn compute_renumeration(
             ref self: ComponentState<TContractState>,
             member: MemberResponse,
@@ -145,6 +200,11 @@ pub mod DisbursementComponent {
             renumeration
         }
 
+        /// Updates the payout interval for an existing schedule.
+        ///
+        /// ### Parameters
+        /// - `schedule_id`: The ID of the schedule to modify.
+        /// - `new_interval`: The new interval in seconds.
         fn update_schedule_interval(
             ref self: ComponentState<TContractState>, schedule_id: u64, new_interval: u64,
         ) {
@@ -157,6 +217,11 @@ pub mod DisbursementComponent {
             self.previous_schedules.entry(schedule_id).write(disbursement_schedule);
         }
 
+        /// Updates the type (Recurring/One-Time) for an existing schedule.
+        ///
+        /// ### Parameters
+        /// - `schedule_id`: The ID of the schedule to modify.
+        /// - `schedule_type`: The new schedule type.
         fn update_schedule_type(
             ref self: ComponentState<TContractState>, schedule_id: u64, schedule_type: ScheduleType,
         ) {
@@ -169,10 +234,18 @@ pub mod DisbursementComponent {
             self.previous_schedules.entry(schedule_id).write(disbursement_schedule);
         }
 
+        /// Returns the timestamp of the last payout for the active schedule.
+        ///
+        /// ### Returns
+        /// - `u64`: The Unix timestamp of the last execution.
         fn get_last_disburse_time(self: @ComponentState<TContractState>) -> u64 {
             self.current_schedule.read().last_execution
         }
 
+        /// Calculates the timestamp for the next expected payout.
+        ///
+        /// ### Returns
+        /// - `u64`: The Unix timestamp of the next disbursement.
         fn get_next_disburse_time(self: @ComponentState<TContractState>) -> u64 {
             let current_schedule = self.current_schedule.read();
             let now = get_block_timestamp();
@@ -186,15 +259,23 @@ pub mod DisbursementComponent {
         }
     }
 
+    /// # InternalImpl
+    ///
+    /// Internal functions for initialization and privileged operations.
     #[generate_trait]
     pub impl InternalImpl<
         TContractState, +HasComponent<TContractState>,
     > of InternalTrait<TContractState> {
+        /// Grants another address permission to call privileged functions.
+        ///
+        /// ### Parameters
+        /// - `user`: The address to authorize.
         fn _add_authorized_caller(ref self: ComponentState<TContractState>, user: ContractAddress) {
             self._assert_caller();
             self.authorized_callers.entry(user).write(true);
         }
 
+        /// Asserts that the function caller is authorized. Reverts if not.
         fn _assert_caller(ref self: ComponentState<TContractState>) {
             let caller = get_caller_address();
             assert(
@@ -203,6 +284,10 @@ pub mod DisbursementComponent {
             );
         }
 
+        /// Marks a schedule as deleted.
+        ///
+        /// ### Parameters
+        /// - `schedule_id`: The ID of the schedule to delete.
         fn _delete_schedule(ref self: ComponentState<TContractState>, schedule_id: u64) {
             self._assert_caller();
             let mut disbursement_schedule = self.current_schedule.read();
@@ -213,6 +298,13 @@ pub mod DisbursementComponent {
             self.current_schedule.write(disbursement_schedule);
         }
 
+        /// Initializes the first disbursement schedule for the component.
+        ///
+        /// ### Parameters
+        /// - `schedule_type`: Type of schedule (0: Recurring, 1: One-Time).
+        /// - `start`: Unix timestamp for the schedule's start time.
+        /// - `end`: Unix timestamp for the schedule's end time.
+        /// - `interval`: Payout interval in seconds.
         fn _initialize(
             ref self: ComponentState<TContractState>,
             schedule_type: u8,
@@ -240,6 +332,10 @@ pub mod DisbursementComponent {
             self.current_schedule.write(disbursement_schedule);
         }
 
+        /// Initializes the component's basic state, setting the owner.
+        ///
+        /// ### Parameters
+        /// - `owner`: The address of the owner.
         fn _init(ref self: ComponentState<TContractState>, owner: ContractAddress) {
             self.owner.write(owner);
             self.authorized_callers.entry(owner).write(true);
