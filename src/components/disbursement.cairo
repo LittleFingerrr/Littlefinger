@@ -198,8 +198,8 @@ pub mod DisbursementComponent {
         fn _assert_caller(ref self: ComponentState<TContractState>) {
             let caller = get_caller_address();
             assert(
-                self.authorized_callers.entry(caller).read() || caller == self.owner.read(), 
-                'Caller Not Permitted'
+                self.authorized_callers.entry(caller).read() || caller == self.owner.read(),
+                'Caller Not Permitted',
             );
         }
 
