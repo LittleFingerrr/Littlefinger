@@ -29,28 +29,20 @@ pub mod MemberManagerComponent {
     pub struct Storage {
         /// The total number of administrators in the organization.
         pub admin_count: u64,
-
         /// Maps a contract address to a boolean indicating admin status.
         pub admin_ca: Map<ContractAddress, bool>,
-
         /// Maps a unique member ID (`u256`) to a `MemberNode`.
         pub members: Map<u256, MemberNode>,
-
         /// Counter for the total number of members.
         pub member_count: u256,
-
         /// Role value weights for governance or weighted calculations.
         pub role_value: Vec<u16>,
-
         /// Member configuration node.
         pub config: MemberConfigNode,
-
         /// Maps member addresses to their invite details.
         pub member_invites: Map<ContractAddress, MemberInvite>,
-
         /// Address of the associated factory contract.
         pub factory: ContractAddress,
-
         /// Address of the core organization contract.
         pub core_org: ContractAddress,
     }
@@ -475,7 +467,7 @@ pub mod MemberManagerComponent {
             }
         }
 
-         /// Asserts the caller is an admin.
+        /// Asserts the caller is an admin.
         ///
         /// Reverts with `"UNAUTHORIZED"` if not.
         fn assert_admin(self: @ComponentState<TContractState>) {
