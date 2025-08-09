@@ -1,3 +1,17 @@
+/// ## A Starknet contract that acts as the central hub for an organization.
+///
+/// This core contract integrates multiple components to manage a complete organizational structure.
+/// It is responsible for:
+/// - Initializing all components with the organization's details.
+/// - Coordinating high-level workflows, such as payroll and disbursements.
+/// - Acting as the primary entry point for managing the organization.
+///
+/// It brings together the following components:
+/// - `MemberManagerComponent`: For handling member data and roles.
+/// - `OrganizationComponent`: For storing general organization metadata.
+/// - `VotingComponent`: For governance and proposals.
+/// - `DisbursementComponent`: For managing payment schedules and calculations.
+/// - `OwnableComponent` and `UpgradeableComponent`: For access control and contract upgrades.
 #[starknet::contract]
 mod Core {
     use MemberManagerComponent::MemberInternalTrait;
@@ -46,37 +60,52 @@ mod Core {
 
     impl DisbursementInternalImpl = DisbursementComponent::InternalImpl<ContractState>;
 
+    /// Defines the storage layout for the `Core` contract.
     #[storage]
     #[allow(starknet::colliding_storage_paths)]
     struct Storage {
+        /// The address of the associated vault contract.
         vault_address: ContractAddress,
+        /// Substorage for the MemberManager component.
         #[substorage(v0)]
         member: MemberManagerComponent::Storage, //my component
+        /// Substorage for the Ownable component.
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        /// Substorage for the Upgradeable component.
         #[substorage(v0)]
         upgradeable: UpgradeableComponent::Storage,
+        /// Substorage for the Organization component.
         #[substorage(v0)]
         organization: OrganizationComponent::Storage, //my component
+        /// Substorage for the Voting component.
         #[substorage(v0)]
         voting: VotingComponent::Storage, //my component
+        /// Substorage for the Disbursement component.
         #[substorage(v0)]
         disbursement: DisbursementComponent::Storage //my component
     }
 
+    /// Events emitted by the `Core` contract, including events from all its components.
     #[event]
     #[derive(Drop, starknet::Event)]
     enum Event {
+        /// Emits member-related events.
         #[flat]
         MemberEvent: MemberManagerComponent::Event,
+        /// Emits ownable-related events.
         #[flat]
         OwnableEvent: OwnableComponent::Event,
+        /// Emits upgradeable-related events.
         #[flat]
         UpgradeableEvent: UpgradeableComponent::Event,
+        /// Emits organization-related events.
         #[flat]
         OrganizationEvent: OrganizationComponent::Event,
+        /// Emits voting-related events.
         #[flat]
         VotingEvent: VotingComponent::Event,
+        /// Emits disbursement-related events.
         #[flat]
         DisbursementEvent: DisbursementComponent::Event,
     }
@@ -88,6 +117,20 @@ mod Core {
     //     pub lastname: felt252,
     // }
 
+    /// Initializes the Core contract and all its integrated components.
+    ///
+    /// ### Parameters
+    /// - `org_id`: A unique identifier for the organization.
+    /// - `org_name`: The name of the organization.
+    /// - `owner`: The address of the initial owner and first admin.
+    /// - `ipfs_url`: A URL pointing to organization metadata (e.g., on IPFS).
+    /// - `vault_address`: The address of the organization's vault contract.
+    /// - `first_admin_fname`: First name of the initial admin.
+    /// - `first_admin_lname`: Last name of the initial admin.
+    /// - `first_admin_alias`: Alias of the initial admin.
+    /// - `deployer`: The address of the contract deployer.
+    /// - `organization_type`: A numerical identifier for the type of organization.
+    /// - `factory`: The address of the factory contract that deployed this core contract.
     #[constructor]
     fn constructor(
         ref self: ContractState,
@@ -138,6 +181,13 @@ mod Core {
 
     #[abi(embed_v0)]
     impl UpgradeableImpl of IUpgradeable<ContractState> {
+        /// Upgrades the contract to a new class hash.
+        ///
+        /// ### Parameters
+        /// - `new_class_hash`: The class hash of the new contract implementation.
+        ///
+        /// ### Panics
+        /// - If the caller is not the owner.
         fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
             // This might be upgraded from the factory
             self.ownable.assert_only_owner();
@@ -149,8 +199,19 @@ mod Core {
 
     // TODO: DO TRANSFER FROM HERE WHEN YOU WANT TO PAYOUT
 
+    /// # CoreImpl
+    ///
+    /// Public-facing implementation of the `ICore` interface.
     #[abi(embed_v0)]
     impl CoreImpl of ICore<ContractState> {
+        /// Initializes a new disbursement schedule. This function is a pass-through
+        /// to the Disbursement component.
+        ///
+        /// ### Parameters
+        /// - `schedule_type`: Type of schedule (e.g., weekly, monthly).
+        /// - `start`: Unix timestamp for the schedule's start time.
+        /// - `end`: Unix timestamp for the schedule's end time.
+        /// - `interval`: Payout interval in seconds.
         fn initialize_disbursement_schedule(
             ref self: ContractState,
             schedule_type: u8,
@@ -162,6 +223,17 @@ mod Core {
             self.disbursement._initialize(schedule_type, start, end, interval)
         }
 
+        /// Executes a scheduled payout to all members.
+        ///
+        /// This function calculates the total weight of all members based on their roles,
+        /// determines each member's share of the available funds and bonus allocation,
+        /// and instructs the vault to transfer the corresponding amounts.
+        ///
+        /// ### Panics
+        /// - If there is no active disbursement schedule.
+        /// - If the payout is attempted before the scheduled start time or after the end time.
+        /// - If the payout is attempted before the required interval has passed since the last
+        /// execution.
         fn schedule_payout(ref self: ContractState) {
             let caller = get_caller_address();
             let members = self.member.get_members();
