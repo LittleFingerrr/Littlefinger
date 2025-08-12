@@ -1,4 +1,4 @@
-/// ## An Starknet component responsible for managing the core details of an organization.
+/// ## A Starknet component responsible for managing the core details of an organization.
 ///
 /// This component handles:
 /// - Storing fundamental organization information (name, ID, owner, etc.).
