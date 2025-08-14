@@ -1,3 +1,5 @@
+use starknet::ContractAddress;
+
 /// # ICore
 ///
 /// This trait defines the public interface for the central core contract of an organization.
@@ -18,7 +20,7 @@ pub trait ICore<T> {
     /// ## Parameters
     ///
     /// - `ref self: T`: The current state of the contract.
-    fn schedule_payout(ref self: T);
+    fn schedule_payout(ref self: T, token: ContractAddress);
 
     /// # initialize_disbursement_schedule
     ///

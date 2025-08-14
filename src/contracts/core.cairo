@@ -234,7 +234,7 @@ mod Core {
         /// - If the payout is attempted before the scheduled start time or after the end time.
         /// - If the payout is attempted before the required interval has passed since the last
         /// execution.
-        fn schedule_payout(ref self: ContractState) {
+        fn schedule_payout(ref self: ContractState, token: ContractAddress) {
             let caller = get_caller_address();
             let members = self.member.get_members();
             let no_of_members = members.len();
@@ -243,8 +243,8 @@ mod Core {
             let vault_address = org_info.vault_address;
 
             let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
-            let total_bonus = vault_dispatcher.get_bonus_allocation();
-            let total_funds = vault_dispatcher.get_balance();
+            let total_bonus = vault_dispatcher.get_bonus_allocation(token);
+            let total_funds = vault_dispatcher.get_token_balance(token);
 
             let current_schedule = self.disbursement.get_current_schedule();
             assert(current_schedule.status == ScheduleStatus::ACTIVE, 'Schedule not active');
@@ -282,7 +282,7 @@ mod Core {
                     .disbursement
                     .compute_renumeration(current_member_response, total_bonus, total_weight);
                 let timestamp = get_block_timestamp();
-                vault_dispatcher.pay_member(current_member_response.address, amount);
+                vault_dispatcher.pay_member(token, current_member_response.address, amount);
                 // self.member.record_member_payment(current_member_response.id, amount, timestamp)
             }
 

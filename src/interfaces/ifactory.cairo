@@ -208,9 +208,9 @@ pub trait IFactory<T> {
     // fn get_vault_org_pairs(self: @T) -> Array<(ContractAddress, ContractAddress)>;
 
     // in the future, you can upgrade a deployed org core from here
-    // fn initialize_upgrade(ref self: T, vaults: Array<ContractAddress>, cores:
-    // Array<ContractAddress>);
-    // this function would pick the updated class hash from the storage, if the class hash has been
-    // updated at present, it can only pick the latest...
-    // in the future, it can pick a specific class hash version
+// fn initialize_upgrade(ref self: T, vaults: Array<ContractAddress>, cores:
+// Array<ContractAddress>);
+// this function would pick the updated class hash from the storage, if the class hash has been
+// updated at present, it can only pick the latest...
+// in the future, it can pick a specific class hash version
 }

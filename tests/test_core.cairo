@@ -205,8 +205,8 @@ fn setup_full_organization() -> (
 
     // Fund the vault
     start_cheat_caller_address(vault_address, owner);
-    vault_dispatcher.deposit_funds(5000000000000000000000, owner);
-    vault_dispatcher.add_to_bonus_allocation(1000000000000000000000, owner);
+    vault_dispatcher.deposit_funds(token_address, 5000000000000000000000, owner);
+    vault_dispatcher.add_to_bonus_allocation(token_address, 1000000000000000000000, owner);
     stop_cheat_caller_address(vault_address);
 
     (
@@ -242,6 +242,7 @@ fn setup_organization_no_bonus() -> (
     let (factory_address, _) = factory_contract.deploy(@factory_calldata).unwrap();
     let factory_dispatcher = IFactoryDispatcher { contract_address: factory_address };
 
+    start_cheat_caller_address(factory_address, owner());
     let (core_address, vault_address) = factory_dispatcher
         .setup_org(
             token: token_address,
@@ -254,6 +255,7 @@ fn setup_organization_no_bonus() -> (
             first_admin_alias: 'admin',
             organization_type: 0,
         );
+    stop_cheat_caller_address(factory_address);
 
     let core_dispatcher = ICoreDispatcher { contract_address: core_address };
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
@@ -269,7 +271,7 @@ fn setup_organization_no_bonus() -> (
 
     // Fund the vault without bonus allocation
     start_cheat_caller_address(vault_address, owner());
-    vault_dispatcher.deposit_funds(5000000000000000000000, owner()); // 5,000 tokens
+    vault_dispatcher.deposit_funds(token_address, 5000000000000000000000, owner()); // 5,000 tokens
     // Skip add_to_bonus_allocation to keep bonus at 0
     stop_cheat_caller_address(vault_address);
 
@@ -397,7 +399,7 @@ fn test_schedule_payout_before_start_time() {
     start_cheat_block_timestamp(core_address, start_time - 100);
 
     start_cheat_caller_address(core_address, owner);
-    core_dispatcher.schedule_payout();
+    core_dispatcher.schedule_payout(_token_address);
     stop_cheat_caller_address(core_address);
 
     stop_cheat_block_timestamp(core_address);
@@ -430,7 +432,7 @@ fn test_schedule_payout_after_end_time() {
     start_cheat_block_timestamp(core_address, end_time + 100);
 
     start_cheat_caller_address(core_address, owner);
-    core_dispatcher.schedule_payout();
+    core_dispatcher.schedule_payout(_token_address);
     stop_cheat_caller_address(core_address);
 
     stop_cheat_block_timestamp(core_address);
@@ -466,7 +468,7 @@ fn test_schedule_payout_with_paused_schedule() {
     start_cheat_block_timestamp(core_address, start_time + 100);
 
     start_cheat_caller_address(core_address, owner);
-    core_dispatcher.schedule_payout();
+    core_dispatcher.schedule_payout(_token_address);
     stop_cheat_caller_address(core_address);
 
     stop_cheat_block_timestamp(core_address);
@@ -495,7 +497,7 @@ fn test_schedule_payout_at_end_timestamp() {
     stop_cheat_caller_address(core_address);
     start_cheat_block_timestamp(core_address, end_time);
     start_cheat_caller_address(core_address, owner);
-    core_dispatcher.schedule_payout();
+    core_dispatcher.schedule_payout(_token_address);
     stop_cheat_caller_address(core_address);
     stop_cheat_block_timestamp(core_address);
 }
@@ -516,7 +518,7 @@ fn test_schedule_payout_inactive_schedule() {
     add_test_members(core_dispatcher, core_address);
 
     start_cheat_caller_address(core_address, owner);
-    core_dispatcher.schedule_payout();
+    core_dispatcher.schedule_payout(_token_address);
     stop_cheat_caller_address(core_address);
 }
 
@@ -556,7 +558,7 @@ fn test_schedule_payout_successful() {
     let employee1_balance = _token_dispatcher.balance_of(employee1());
 
     start_cheat_caller_address(core_address, owner);
-    core_dispatcher.schedule_payout();
+    core_dispatcher.schedule_payout(_token_address);
     stop_cheat_caller_address(core_address);
 
     let new_employee1_balance = _token_dispatcher.balance_of(employee1());
