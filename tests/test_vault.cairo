@@ -111,14 +111,25 @@ fn deploy_mock_erc20() -> (IMockERC20Dispatcher, ContractAddress) {
     (dispatcher, contract_address)
 }
 
-fn deploy_vault() -> (IVaultDispatcher, ContractAddress, ContractAddress) {
-    let (token_dispatcher, token_address) = deploy_mock_erc20();
+fn deploy_another_mock_erc20() -> (IMockERC20Dispatcher, ContractAddress) {
+    let contract = declare("AnotherMockERC20").unwrap().contract_class();
+    let (contract_address, _) = contract.deploy(@array![]).unwrap();
+    let dispatcher = IMockERC20Dispatcher { contract_address };
+
+    (dispatcher, contract_address)
+}
+
+fn deploy_vault() -> (IVaultDispatcher, ContractAddress, ContractAddress, ContractAddress) {
+    let (token1_dispatcher, token1_address) = deploy_mock_erc20();
+    let (token2_dispatcher, token2_address) = deploy_mock_erc20();
 
     let vault_contract = declare("Vault").unwrap().contract_class();
     let owner_address = owner();
+    let token_addresses = array![token1_address, token2_address];
 
     // Use array! macro with explicit typing for deployment
-    let constructor_calldata = array![token_address.into(), owner_address.into()];
+    let mut constructor_calldata = array![owner_address.into()];
+    token_addresses.serialize(ref constructor_calldata);
 
     let (vault_address, _) = vault_contract.deploy(@constructor_calldata).unwrap();
     let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
@@ -131,159 +142,191 @@ fn deploy_vault() -> (IVaultDispatcher, ContractAddress, ContractAddress) {
     vault_dispatcher.allow_org_core_address(recipient());
     stop_cheat_caller_address(vault_address);
 
-    // Setup token approvals for all addresses
-    start_cheat_caller_address(token_address, owner_address);
-    token_dispatcher.approve(vault_address, 1000000000000000000000);
-    stop_cheat_caller_address(token_address);
+    // Setup token1 approvals for all addresses
+    start_cheat_caller_address(token1_address, owner_address);
+    token1_dispatcher.approve(vault_address, 1000000000000000000000);
+    stop_cheat_caller_address(token1_address);
 
-    start_cheat_caller_address(token_address, permitted_caller());
-    token_dispatcher.approve(vault_address, 1000000000000000000000);
-    stop_cheat_caller_address(token_address);
+    start_cheat_caller_address(token1_address, permitted_caller());
+    token1_dispatcher.approve(vault_address, 1000000000000000000000);
+    stop_cheat_caller_address(token1_address);
 
-    start_cheat_caller_address(token_address, recipient());
-    token_dispatcher.approve(vault_address, 1000000000000000000000);
-    stop_cheat_caller_address(token_address);
+    start_cheat_caller_address(token1_address, recipient());
+    token1_dispatcher.approve(vault_address, 1000000000000000000000);
+    stop_cheat_caller_address(token1_address);
 
     // Transfer some tokens to the vault for payment operations
-    start_cheat_caller_address(token_address, owner_address);
-    token_dispatcher.transfer(vault_address, 100000000000000000000); // 100 tokens
-    stop_cheat_caller_address(token_address);
+    start_cheat_caller_address(token1_address, owner_address);
+    token1_dispatcher.transfer(vault_address, 100000000000000000000); // 100 tokens
+    stop_cheat_caller_address(token1_address);
 
-    (vault_dispatcher, vault_address, token_address)
+    // Setup token2 approvals for all addresses
+    start_cheat_caller_address(token2_address, owner_address);
+    token2_dispatcher.approve(vault_address, 2000000000000000000000);
+    stop_cheat_caller_address(token2_address);
+
+    start_cheat_caller_address(token2_address, permitted_caller());
+    token2_dispatcher.approve(vault_address, 2000000000000000000000);
+    stop_cheat_caller_address(token2_address);
+
+    start_cheat_caller_address(token2_address, recipient());
+    token2_dispatcher.approve(vault_address, 2000000000000000000000);
+    stop_cheat_caller_address(token2_address);
+
+    // Transfer some tokens to the vault for payment operations
+    start_cheat_caller_address(token2_address, owner_address);
+    token2_dispatcher.transfer(vault_address, 200000000000000000000); // 200 tokens
+    stop_cheat_caller_address(token2_address);
+
+    (vault_dispatcher, vault_address, token1_address, token2_address)
 }
 
 // Constructor Tests
 #[test]
 fn test_constructor_initializes_correctly() {
-    let (vault, _vault_address, _token_address) = deploy_vault();
-    assert(vault.get_balance() == 100000000000000000000, 'Incorrect initial balance');
-    assert(vault.get_bonus_allocation() == 0, 'Incorrect bonus allocation');
+    let (vault, _vault_address, _token1_address, _token2_address) = deploy_vault();
+    assert(
+        vault.get_token_balance(_token1_address) == 100000000000000000000,
+        'Incorrect initial balance',
+    );
+    assert(vault.get_bonus_allocation(_token1_address) == 0, 'Incorrect bonus allocation');
+    assert(
+        vault.get_token_balance(_token2_address) == 200000000000000000000,
+        'Incorrect initial balance',
+    );
+    assert(vault.get_bonus_allocation(_token2_address) == 0, 'Incorrect bonus allocation');
     assert(vault.get_vault_status() == VaultStatus::VAULTRESUMED, 'Vault should be resumed');
 }
 
 // Deposit Tests
 #[test]
 fn test_deposit_funds_success() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
     let deposit_amount = 100000000000000000; // 0.1 ETH
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let first_vault_balance = vault.get_balance();
-    vault.deposit_funds(deposit_amount, owner());
+    let first_vault_balance = vault.get_token_balance(_token1_address);
+    vault.deposit_funds(_token1_address, deposit_amount, owner());
     stop_cheat_caller_address(vault_address);
 
     // Check balance updated
     let expected_balance = first_vault_balance + deposit_amount;
-    assert(vault.get_balance() == expected_balance, 'Balance not updated correctly');
+    assert(
+        vault.get_token_balance(_token1_address) == expected_balance,
+        'Balance not updated correctly',
+    );
 }
 
 #[test]
 #[should_panic(expected: 'Direct Caller not permitted')]
 fn test_deposit_funds_unauthorized_caller() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
 
     start_cheat_caller_address(vault_address, non_permitted_caller());
-    vault.deposit_funds(100000000000000000, owner());
+    vault.deposit_funds(_token1_address, 100000000000000000, owner());
     stop_cheat_caller_address(vault_address);
 }
 
 #[test]
 #[should_panic(expected: 'Deep Caller Not Permitted')]
 fn test_deposit_funds_unauthorized_deep_caller() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    vault.deposit_funds(100000000000000000, non_permitted_caller());
+    vault.deposit_funds(_token1_address, 100000000000000000, non_permitted_caller());
     stop_cheat_caller_address(vault_address);
 }
 
 #[test]
 #[should_panic(expected: 'Vault Frozen for Transactions')]
 fn test_deposit_funds_when_vault_frozen() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
 
     // Freeze vault first
     start_cheat_caller_address(vault_address, permitted_caller());
     vault.emergency_freeze();
 
     // Try to deposit - should fail
-    vault.deposit_funds(100000000000000000, owner());
+    vault.deposit_funds(_token1_address, 100000000000000000, owner());
     stop_cheat_caller_address(vault_address);
 }
 
 // Withdrawal Tests
 #[test]
 fn test_withdraw_funds_success() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
     let withdraw_amount = 1000000000000000; // 0.1 ETH
 
     start_cheat_caller_address(vault_address, owner());
-    vault.deposit_funds(withdraw_amount + 1000, owner());
+    vault.deposit_funds(_token1_address, withdraw_amount + 1000, owner());
     stop_cheat_caller_address(vault_address);
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let first_vault_balance = vault.get_balance();
-    vault.withdraw_funds(withdraw_amount, recipient());
+    let first_vault_balance = vault.get_token_balance(_token1_address);
+    vault.withdraw_funds(_token1_address, withdraw_amount, recipient());
     stop_cheat_caller_address(vault_address);
 
     // Check balance updated
     let expected_balance = first_vault_balance - withdraw_amount;
-    assert(vault.get_balance() == expected_balance, 'Balance not updated correctly');
+    assert(
+        vault.get_token_balance(_token1_address) == expected_balance,
+        'Balance not updated correctly',
+    );
 }
 
 #[test]
 #[should_panic(expected: 'Direct Caller not permitted')]
 fn test_withdraw_funds_unauthorized_caller() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
 
     start_cheat_caller_address(vault_address, non_permitted_caller());
-    vault.withdraw_funds(100000000000000000, recipient());
+    vault.withdraw_funds(_token1_address, 100000000000000000, recipient());
     stop_cheat_caller_address(vault_address);
 }
 
 #[test]
 #[should_panic(expected: 'Deep Caller Not Permitted')]
 fn test_withdraw_funds_unauthorized_deep_caller() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    vault.withdraw_funds(100000000000000000, non_permitted_caller());
+    vault.withdraw_funds(_token1_address, 100000000000000000, non_permitted_caller());
     stop_cheat_caller_address(vault_address);
 }
 
 #[test]
 #[should_panic(expected: 'Insufficient Balance')]
 fn test_withdraw_funds_insufficient_balance() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
     let excessive_amount = 300000000000000000000; // 2 ETH (more than available)
 
     start_cheat_caller_address(vault_address, owner());
-    vault.deposit_funds(excessive_amount / 1000, owner());
+    vault.deposit_funds(_token1_address, excessive_amount / 1000, owner());
     stop_cheat_caller_address(vault_address);
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    vault.withdraw_funds(excessive_amount, recipient());
+    vault.withdraw_funds(_token1_address, excessive_amount, recipient());
     stop_cheat_caller_address(vault_address);
 }
 
 #[test]
 #[should_panic(expected: 'Vault Frozen for Transactions')]
 fn test_withdraw_funds_when_vault_frozen() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _) = deploy_vault();
 
     // Freeze vault first
     start_cheat_caller_address(vault_address, permitted_caller());
     vault.emergency_freeze();
 
     // Try to withdraw - should fail
-    vault.withdraw_funds(100000000000000000, recipient());
+    vault.withdraw_funds(_token1_address, 100000000000000000, recipient());
     stop_cheat_caller_address(vault_address);
 }
 
 // Freeze/Unfreeze Tests
 #[test]
 fn test_emergency_freeze_success() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
     vault.emergency_freeze();
@@ -294,9 +337,9 @@ fn test_emergency_freeze_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Caller not permitted')]
+#[should_panic(expected: 'Direct Caller not permitted')]
 fn test_emergency_freeze_unauthorized() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, non_permitted_caller());
     vault.emergency_freeze();
@@ -306,7 +349,7 @@ fn test_emergency_freeze_unauthorized() {
 #[test]
 #[should_panic(expected: 'Vault Already Frozen')]
 fn test_emergency_freeze_already_frozen() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
     vault.emergency_freeze();
@@ -316,7 +359,7 @@ fn test_emergency_freeze_already_frozen() {
 
 #[test]
 fn test_unfreeze_vault_success() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
 
@@ -330,9 +373,9 @@ fn test_unfreeze_vault_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Caller not permitted')]
+#[should_panic(expected: 'Direct Caller not permitted')]
 fn test_unfreeze_vault_unauthorized() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     // Freeze first
     start_cheat_caller_address(vault_address, permitted_caller());
@@ -348,7 +391,7 @@ fn test_unfreeze_vault_unauthorized() {
 #[test]
 #[should_panic(expected: 'Vault Not Frozen')]
 fn test_unfreeze_vault_not_frozen() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
     vault.unfreeze_vault(); // Should fail - vault is not frozen
@@ -358,87 +401,94 @@ fn test_unfreeze_vault_not_frozen() {
 // Pay Member Tests
 #[test]
 fn test_pay_member_success() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
     let payment_amount = 100000000000000; // 0.1 ETH
 
     start_cheat_caller_address(vault_address, owner());
-    vault.deposit_funds(payment_amount + 1000, owner());
+    vault.deposit_funds(_token1_address, payment_amount + 1000, owner());
     stop_cheat_caller_address(vault_address);
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let first_vault_balance = vault.get_balance();
-    vault.pay_member(recipient(), payment_amount);
+    let first_vault_balance = vault.get_token_balance(_token1_address);
+    vault.pay_member(_token1_address, recipient(), payment_amount);
     stop_cheat_caller_address(vault_address);
 
     // Check balance updated
     let expected_balance = first_vault_balance - payment_amount;
-    assert(vault.get_balance() == expected_balance, 'Balance not updated correctly');
+    assert(
+        vault.get_token_balance(_token1_address) == expected_balance,
+        'Balance not updated correctly',
+    );
 }
 
 #[test]
-#[should_panic(expected: 'Caller Not Permitted')]
+#[should_panic(expected: 'Direct Caller not permitted')]
 fn test_pay_member_unauthorized() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, non_permitted_caller());
-    vault.pay_member(recipient(), 100000000000000000);
+    vault.pay_member(_token1_address, recipient(), 100000000000000000);
     stop_cheat_caller_address(vault_address);
 }
 
 // Bonus Allocation Tests
 #[test]
 fn test_add_to_bonus_allocation_success() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
     let bonus_amount = 100000000000000000; // 0.1 ETH
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let starting_bonus_allocation = vault.get_bonus_allocation();
-    vault.add_to_bonus_allocation(bonus_amount, owner());
+    let starting_bonus_allocation = vault.get_bonus_allocation(_token1_address);
+    vault.add_to_bonus_allocation(_token1_address, bonus_amount, owner());
     stop_cheat_caller_address(vault_address);
 
     // Check bonus updated
     let expected_bonus = starting_bonus_allocation + bonus_amount;
-    assert(vault.get_bonus_allocation() == expected_bonus, 'Bonus not updated correctly');
+    assert(
+        vault.get_bonus_allocation(_token1_address) == expected_bonus,
+        'Bonus not updated correctly',
+    );
 }
 
 #[test]
 #[should_panic(expected: 'Direct Caller not permitted')]
 fn test_add_to_bonus_allocation_unauthorized() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, non_permitted_caller());
-    vault.add_to_bonus_allocation(100000000000000000, owner());
+    vault.add_to_bonus_allocation(_token1_address, 100000000000000000, owner());
     stop_cheat_caller_address(vault_address);
 }
 
 #[test]
 #[should_panic(expected: 'Deep Caller Not Permitted')]
 fn test_add_to_bonus_allocation_unauthorized_deep_caller() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    vault.add_to_bonus_allocation(100000000000000000, non_permitted_caller());
+    vault.add_to_bonus_allocation(_token1_address, 100000000000000000, non_permitted_caller());
     stop_cheat_caller_address(vault_address);
 }
 
 // Transaction History Tests
 #[test]
 fn test_transaction_history_records_correctly() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
     let deposit_amount = 100000000000000000;
     let withdraw_amount = 50000000000000000;
 
     start_cheat_caller_address(vault_address, permitted_caller());
 
     // Perform some transactions
-    vault.deposit_funds(deposit_amount, owner());
-    vault.withdraw_funds(withdraw_amount, recipient());
-    vault.add_to_bonus_allocation(25000000000000000, owner());
+    vault.deposit_funds(_token1_address, deposit_amount, owner());
+    vault.withdraw_funds(_token1_address, withdraw_amount, recipient());
+    vault.add_to_bonus_allocation(_token1_address, 25000000000000000, owner());
 
     stop_cheat_caller_address(vault_address);
 
     // Check transaction history
     let history = vault.get_transaction_history();
+    println!("history: {:?}", history);
     assert(history.len() == 3, 'Should have 3 transactions');
 
     // Check first transaction (deposit)
@@ -466,14 +516,14 @@ fn test_transaction_history_records_correctly() {
 // Access Control Tests
 #[test]
 fn test_allow_org_core_address() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
     let new_org_address = contract_address_const::<'new_org'>();
 
     vault.allow_org_core_address(new_org_address);
 
     // Test that the new address can now call functions
     start_cheat_caller_address(vault_address, new_org_address);
-    vault.deposit_funds(100000000000000000, owner());
+    vault.deposit_funds(_token1_address, 100000000000000000, owner());
     stop_cheat_caller_address(vault_address);
 }
 
@@ -481,22 +531,22 @@ fn test_allow_org_core_address() {
 #[test]
 #[ignore]
 fn test_get_balance() {
-    let (vault, _, _) = deploy_vault();
-    let balance = vault.get_balance();
+    let (vault, _, _token1_address, _token2_address) = deploy_vault();
+    let balance = vault.get_token_balance(_token1_address);
     assert(balance == 1000000000000000000, 'Incorrect balance');
 }
 
 #[test]
 #[ignore]
 fn test_get_bonus_allocation() {
-    let (vault, _, _) = deploy_vault();
-    let bonus = vault.get_bonus_allocation();
+    let (vault, _, _token1_address, _token2_address) = deploy_vault();
+    let bonus = vault.get_bonus_allocation(_token1_address);
     assert(bonus == 0, 'Incorrect bonus allocation');
 }
 
 #[test]
 fn test_get_vault_status() {
-    let (vault, _, _) = deploy_vault();
+    let (vault, _, _token1_address, _token2_address) = deploy_vault();
     let status = vault.get_vault_status();
     assert(status == VaultStatus::VAULTRESUMED, 'Incorrect vault status');
 }
@@ -505,67 +555,72 @@ fn test_get_vault_status() {
 #[test]
 #[should_panic(expected: 'Invalid Amount')]
 fn test_zero_amount_deposit() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let first_vault_balance = vault.get_balance();
-    let first_bonus_allocation = vault.get_bonus_allocation();
+    let first_vault_balance = vault.get_token_balance(_token1_address);
+    let first_bonus_allocation = vault.get_bonus_allocation(_token1_address);
     // Test zero deposit
-    vault.deposit_funds(0, owner());
+    vault.deposit_funds(_token1_address, 0, owner());
 }
 
 #[test]
 #[should_panic(expected: 'Invalid Address')]
 fn test_zero_address_deposit() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let first_vault_balance = vault.get_balance();
-    let first_bonus_allocation = vault.get_bonus_allocation();
+    let first_vault_balance = vault.get_token_balance(_token1_address);
+    let first_bonus_allocation = vault.get_bonus_allocation(_token1_address);
     // Test zero deposit
-    vault.deposit_funds(250, zero_addr());
+    vault.deposit_funds(_token1_address, 250, zero_addr());
 }
 
 // Integration Tests
 #[test]
 fn test_complete_vault_workflow() {
-    let (vault, vault_address, _) = deploy_vault();
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
     start_cheat_caller_address(vault_address, permitted_caller());
-    let mut vault_balance = vault.get_balance();
-    let mut bonus_allocation = vault.get_bonus_allocation();
+    let mut vault_balance = vault.get_token_balance(_token1_address);
+    let mut bonus_allocation = vault.get_bonus_allocation(_token1_address);
     // 1. Deposit funds
     let deposit_amount = 200000000000000000; // 0.2 ETH
-    vault.deposit_funds(deposit_amount, owner());
+    vault.deposit_funds(_token1_address, deposit_amount, owner());
     println!("Did not fail before deposit");
 
     let expected_balance = vault_balance + deposit_amount;
     vault_balance += deposit_amount;
-    assert(vault.get_balance() == expected_balance, 'Deposit failed');
+    assert(vault.get_token_balance(_token1_address) == expected_balance, 'Deposit failed');
 
     // 2. Add bonus allocation
     let bonus_amount = 100000000000000000; // 0.1 ETH
-    vault.add_to_bonus_allocation(bonus_amount, owner());
+    vault.add_to_bonus_allocation(_token1_address, bonus_amount, owner());
 
     let expected_bonus = bonus_allocation + bonus_amount;
     bonus_allocation += bonus_amount;
-    assert(vault.get_bonus_allocation() == expected_bonus, 'Bonus allocation failed');
+    assert(
+        vault.get_bonus_allocation(_token1_address) == expected_bonus, 'Bonus allocation failed',
+    );
 
     // 3. Pay member
     let payment_amount = 150000000000000; // 0.15 ETH
-    vault.pay_member(recipient(), payment_amount);
+    vault.pay_member(_token1_address, recipient(), payment_amount);
     println!("I didn't fail after pay_member");
 
     let expected_balance_after_payment = expected_balance - payment_amount;
-    assert(vault.get_balance() == expected_balance_after_payment, 'Payment failed');
+    assert(
+        vault.get_token_balance(_token1_address) == expected_balance_after_payment,
+        'Payment failed',
+    );
 
     // 4. Withdraw funds
     let withdraw_amount = 100000000000000000; // 0.1 ETH
-    vault.withdraw_funds(withdraw_amount, recipient());
+    vault.withdraw_funds(_token1_address, withdraw_amount, recipient());
     println!("I didn't fail after withdrawal");
 
     let final_expected_balance = expected_balance_after_payment - withdraw_amount;
-    assert(vault.get_balance() == final_expected_balance, 'Withdrawal failed');
+    assert(vault.get_token_balance(_token1_address) == final_expected_balance, 'Withdrawal failed');
 
     // 5. Check transaction history
     let history = vault.get_transaction_history();
@@ -578,5 +633,70 @@ fn test_complete_vault_workflow() {
     vault.unfreeze_vault();
     assert(vault.get_vault_status() == VaultStatus::VAULTRESUMED, 'Unfreeze failed');
 
+    stop_cheat_caller_address(vault_address);
+}
+
+#[test]
+fn test_add_accepted_token() {
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
+
+    let accepted_tokens_before = vault.get_accepted_tokens();
+
+    assert!(accepted_tokens_before.len() == 2, "Incorrect number of accepted tokens");
+    assert(accepted_tokens_before.at(0) == @_token1_address, 'Incorrect accepted token');
+    assert(accepted_tokens_before.at(1) == @_token2_address, 'Incorrect accepted token');
+
+    let new_token_address = contract_address_const::<'new_token'>();
+
+    start_cheat_caller_address(vault_address, permitted_caller());
+    vault.add_accepted_token(new_token_address);
+    stop_cheat_caller_address(vault_address);
+
+    let accepted_tokens_after = vault.get_accepted_tokens();
+
+    assert!(accepted_tokens_after.len() == 3, "Incorrect number of accepted tokens");
+    assert(accepted_tokens_after.at(0) == @_token1_address, 'Incorrect accepted token');
+    assert(accepted_tokens_after.at(1) == @_token2_address, 'Incorrect accepted token');
+    assert(accepted_tokens_after.at(2) == @new_token_address, 'Incorrect accepted token');
+}
+
+#[test]
+#[should_panic(expected: 'Token already accepted')]
+fn test_add_accepted_token_already_accepted() {
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
+
+    start_cheat_caller_address(vault_address, permitted_caller());
+    vault.add_accepted_token(_token1_address);
+    stop_cheat_caller_address(vault_address);
+}
+
+#[test]
+fn test_remove_accepted_token() {
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
+
+    let accepted_tokens_before = vault.get_accepted_tokens();
+
+    assert!(accepted_tokens_before.len() == 2, "Incorrect number of accepted tokens");
+    assert(accepted_tokens_before.at(0) == @_token1_address, 'Incorrect accepted token');
+    assert(accepted_tokens_before.at(1) == @_token2_address, 'Incorrect accepted token');
+
+    start_cheat_caller_address(vault_address, permitted_caller());
+    vault.remove_accepted_token(_token1_address);
+    stop_cheat_caller_address(vault_address);
+
+    let accepted_tokens_after = vault.get_accepted_tokens();
+    println!("accepted_tokens_after: {:?}", accepted_tokens_after);
+
+    assert!(accepted_tokens_after.len() == 1, "Incorrect number of accepted tokens");
+    assert(accepted_tokens_after.at(0) == @_token2_address, 'Incorrect accepted token');
+}
+
+#[test]
+#[should_panic(expected: 'Direct Caller not permitted')]
+fn test_remove_accepted_token_unauthorized() {
+    let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
+
+    start_cheat_caller_address(vault_address, non_permitted_caller());
+    vault.remove_accepted_token(_token1_address);
     stop_cheat_caller_address(vault_address);
 }

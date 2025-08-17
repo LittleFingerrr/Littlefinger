@@ -1,10 +1,10 @@
-/// ## A Starknet contract for managing an organization's financial vault.
+/// ## A Starknet contract for managing an organization's financial vault for multiple tokens.
 ///
 /// This contract is responsible for:
-/// - Securely holding a single type of ERC20 token.
+/// - Securely holding multiple types of ERC20 tokens.
 /// - Processing deposits and withdrawals from authorized addresses.
 /// - Executing payments to organization members.
-/// - Allocating funds for bonuses.
+/// - Allocating funds for bonuses on a per-token basis.
 /// - Recording all transactions for auditing purposes.
 /// - Providing security features like an emergency freeze.
 ///
@@ -19,7 +19,8 @@ pub mod Vault {
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use openzeppelin::upgrades::UpgradeableComponent;
     use starknet::storage::{
-        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, MutableVecTrait, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+        Vec, VecTrait,
     };
     use starknet::{
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
@@ -35,21 +36,19 @@ pub mod Vault {
         /// Maps a contract address to a boolean indicating if it's permitted to interact with the
         /// vault.
         permitted_addresses: Map<ContractAddress, bool>,
-        /// The total balance of the managed token held by the vault.
-        available_funds: u256,
-        /// The portion of the total balance allocated for bonus payments.
-        total_bonus: u256,
-        /// Maps a transaction ID (`u64`) to a `Transaction` struct, storing a history of all vault
+        /// Maps a token address to its portion of the total balance allocated for bonus payments.
+        bonus_allocations: Map<ContractAddress, u256>,
+        /// Maps a transaction ID to a `Transaction` struct, storing a history of all vault
         /// operations.
-        transaction_history: Map<
-            u64, Transaction,
-        >, // No 1. Transaction x, no 2, transaction y etc for history, and it begins with 1
+        transaction_history: Map<u64, Transaction>,
         /// A counter for the total number of transactions processed.
         transactions_count: u64,
         /// The current operational status of the vault (e.g., VAULTACTIVE, VAULTFROZEN).
         vault_status: VaultStatus,
-        /// The contract address of the single ERC20 token this vault manages.
-        token: ContractAddress,
+        /// Maps a token address to a boolean, indicating if it's an accepted asset for the vault.
+        accepted_tokens: Map<ContractAddress, bool>,
+        /// A list of all accepted token addresses for easy retrieval.
+        accepted_tokens_list: Vec<ContractAddress>,
         /// Substorage for the Ownable component.
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
@@ -74,15 +73,16 @@ pub mod Vault {
         TransactionRecorded: TransactionRecorded,
         /// Emitted when funds are allocated to the bonus pool.
         BonusAllocation: BonusAllocation,
+        /// Emitted when a new token is accepted by the vault.
+        TokenAccepted: TokenAccepted,
+        /// Emitted when a token is removed from the list of accepted tokens.
+        TokenRemoved: TokenRemoved,
         /// Flat event for Ownable component events.
         #[flat]
         OwnableEvent: OwnableComponent::Event,
         /// Flat event for Upgradeable component events.
         #[flat]
         UpgradeableEvent: UpgradeableComponent::Event,
-        // TODO:
-    // Add an event here that gets emitted if the money goes below a certain threshold
-    // Threshold Will be decided.
     }
 
     /// Event data for a successful deposit.
@@ -133,151 +133,162 @@ pub mod Vault {
         pub timestamp: u64,
     }
 
+    /// Event data for when a new token is accepted.
+    #[derive(Drop, starknet::Event)]
+    pub struct TokenAccepted {
+        pub added_by: ContractAddress,
+        pub token: ContractAddress,
+    }
+
+    /// Event data for when a token is removed.
+    #[derive(Drop, starknet::Event)]
+    pub struct TokenRemoved {
+        pub removed_by: ContractAddress,
+        pub token: ContractAddress,
+    }
+
     #[abi(embed_v0)]
     impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
-
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
-    // TODO:
-    // Add to this constructor, a way to add addresses and store them as permitted addresses here
     /// Initializes the Vault contract.
     ///
     /// ### Parameters
-    /// - `token`: The contract address of the ERC20 token to be managed.
     /// - `owner`: The address that will have initial ownership and permissions.
     #[constructor]
     fn constructor(
-        ref self: ContractState,
-        token: ContractAddress, // available_funds: u256,
-        // bonus_allocation: u256,
-        owner: ContractAddress,
+        ref self: ContractState, owner: ContractAddress, tokens: Array<ContractAddress>,
     ) {
-        self.token.write(token);
-        self.total_bonus.write(0);
         self.permitted_addresses.entry(owner).write(true);
 
-        self._sync_available_funds();
+        let mut i = 0;
+        while i != tokens.len() {
+            self.accepted_tokens.entry(*tokens.at(i)).write(true);
+            self.accepted_tokens_list.push(*tokens.at(i));
+
+            i += 1;
+        }
     }
-
-    // TODO:
-    // From the ivault, add functions in the interfaces for subtracting from and adding to bonus
-    // IMPLEMENT HERE
-
-    // TODO:
-    // Implement a storage variable, that will be in the constructor, for the token address to be
-    // supplied at deployment For now, we want a single-token implementation
 
     /// # VaultImpl
     ///
     /// Public-facing implementation of the `IVault` interface.
     #[abi(embed_v0)]
     pub impl VaultImpl of IVault<ContractState> {
-        /// Accepts a deposit of the managed token.
+        /// Deposits a specified amount of an accepted token into the vault.
         ///
         /// ### Parameters
-        /// - `amount`: The amount to deposit.
-        /// - `address`: The address from which the funds are being sent.
+        /// - `token`: The `ContractAddress` of the token being deposited.
+        /// - `amount`: The amount of funds to deposit as a `u256`.
+        /// - `from_address`: The `ContractAddress` from which the funds are being sent.
         ///
         /// ### Panics
-        /// - If `amount` or `address` is zero.
-        /// - If the direct caller or the source `address` is not permitted.
+        /// - If `amount` or `from_address` is zero.
+        /// - If the `token` is not on the accepted list.
+        /// - If the direct caller or the source `from_address` is not permitted.
         /// - If the vault is frozen.
-        fn deposit_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
+        fn deposit_funds(
+            ref self: ContractState,
+            token: ContractAddress,
+            amount: u256,
+            from_address: ContractAddress,
+        ) {
             assert(amount.is_non_zero(), 'Invalid Amount');
-            assert(address.is_non_zero(), 'Invalid Address');
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
-            assert(permitted, 'Direct Caller not permitted');
-            assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
-            let current_vault_status = self.vault_status.read();
-            assert(
-                current_vault_status != VaultStatus::VAULTFROZEN, 'Vault Frozen for Transactions',
-            );
+            assert(from_address.is_non_zero(), 'Invalid Address');
+            assert(self.is_token_acceptable(token), 'Token not accepted');
 
-            self._sync_available_funds();
+            let caller = get_caller_address();
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
+            assert(
+                self.permitted_addresses.entry(from_address).read(), 'Deep Caller Not Permitted',
+            );
+            assert(
+                self.vault_status.read() != VaultStatus::VAULTFROZEN,
+                'Vault Frozen for Transactions',
+            );
 
             let timestamp = get_block_timestamp();
             let this_contract = get_contract_address();
-            let token = self.token.read();
             let token_dispatcher = IERC20Dispatcher { contract_address: token };
 
-            token_dispatcher.transfer_from(address, this_contract, amount);
+            token_dispatcher.transfer_from(from_address, this_contract, amount);
 
-            self._record_transaction(token, amount, TransactionType::DEPOSIT, address);
+            self._record_transaction(token, amount, TransactionType::DEPOSIT, from_address);
 
-            self._sync_available_funds();
-
-            self.emit(DepositSuccessful { caller: address, token, timestamp, amount })
+            self.emit(DepositSuccessful { caller: from_address, token, timestamp, amount });
         }
 
-        /// Withdraws the managed token to a specified address.
+        /// Withdraws a specified amount of an accepted token from the vault.
         ///
         /// ### Parameters
-        /// - `amount`: The amount to withdraw.
-        /// - `address`: The address to receive the funds.
+        /// - `token`: The `ContractAddress` of the token being withdrawn.
+        /// - `amount`: The amount of funds to withdraw as a `u256`.
+        /// - `to_address`: The `ContractAddress` to receive the funds.
         ///
         /// ### Panics
-        /// - If `amount` or `address` is zero.
-        /// - If the direct caller or the destination `address` is not permitted.
+        /// - If `amount` or `to_address` is zero.
+        /// - If the `token` is not on the accepted list.
+        /// - If the caller is not a permitted address.
         /// - If the vault is frozen.
-        /// - If the requested amount exceeds the vault's balance.
-        fn withdraw_funds(ref self: ContractState, amount: u256, address: ContractAddress) {
+        /// - If the requested `amount` exceeds the vault's balance for that token.
+        fn withdraw_funds(
+            ref self: ContractState,
+            token: ContractAddress,
+            amount: u256,
+            to_address: ContractAddress,
+        ) {
             assert(amount.is_non_zero(), 'Invalid Amount');
-            assert(address.is_non_zero(), 'Invalid Address');
-            let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
-            assert(permitted, 'Direct Caller not permitted');
-            assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
+            assert(to_address.is_non_zero(), 'Invalid Address');
+            assert(self.is_token_acceptable(token), 'Token not accepted');
 
-            let current_vault_status = self.vault_status.read();
+            let caller = get_caller_address();
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
+            assert(self.permitted_addresses.entry(to_address).read(), 'Deep Caller Not Permitted');
             assert(
-                current_vault_status != VaultStatus::VAULTFROZEN, 'Vault Frozen for Transactions',
+                self.vault_status.read() != VaultStatus::VAULTFROZEN,
+                'Vault Frozen for Transactions',
             );
 
-            self._sync_available_funds();
+            let token_balance = self.get_token_balance(token);
+            assert(amount <= token_balance, 'Insufficient Balance');
+
+            let token_dispatcher = IERC20Dispatcher { contract_address: token };
+            token_dispatcher.transfer(to_address, amount);
+
+            self._record_transaction(token, amount, TransactionType::WITHDRAWAL, to_address);
 
             let timestamp = get_block_timestamp();
-
-            let token = self.token.read();
-            let token_dispatcher = IERC20Dispatcher { contract_address: token };
-            let vault_balance = token_dispatcher.balance_of(get_contract_address());
-            assert(amount <= vault_balance, 'Insufficient Balance');
-
-            token_dispatcher.transfer(address, amount);
-            self._record_transaction(token, amount, TransactionType::WITHDRAWAL, address);
-
-            self._sync_available_funds();
-
-            self.emit(WithdrawalSuccessful { caller: address, token, amount, timestamp })
+            self.emit(WithdrawalSuccessful { caller: to_address, token, amount, timestamp });
         }
 
-        /// Allocates a portion of the vault's funds to the bonus pool.
+        /// Allocates a portion of a token's funds to the bonus pool.
         ///
         /// ### Parameters
+        /// - `token`: The `ContractAddress` of the token for the bonus allocation.
         /// - `amount`: The amount to allocate for bonuses.
         /// - `address`: The address initiating the allocation.
         ///
         /// ### Panics
-        /// - If `amount` or `address` is zero.
-        /// - If the direct caller or the source `address` is not permitted.
+        /// - If the caller is not a permitted address.
+        /// - If the `token` is not on the accepted list.
+        /// - If the `amount` exceeds the available, non-bonus portion of the token's balance.
         fn add_to_bonus_allocation(
-            ref self: ContractState, amount: u256, address: ContractAddress,
+            ref self: ContractState, token: ContractAddress, amount: u256, address: ContractAddress,
         ) {
-            assert(amount.is_non_zero(), 'Invalid Amount');
-            assert(address.is_non_zero(), 'Invalid Address');
             let caller = get_caller_address();
-            let permitted = self.permitted_addresses.entry(caller).read();
-            assert(permitted, 'Direct Caller not permitted');
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
             assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
+            assert(self.is_token_acceptable(token), 'Token not accepted');
 
-            self._sync_available_funds();
+            let current_token_balance = self.get_token_balance(token);
+            let current_token_bonus = self.bonus_allocations.entry(token).read();
+            assert(
+                amount <= current_token_balance - current_token_bonus, 'Bonus exceeds available',
+            );
 
-            self.total_bonus.write(self.total_bonus.read() + amount);
-            self
-                ._record_transaction(
-                    self.token.read(), amount, TransactionType::BONUS_ALLOCATION, address,
-                );
+            self.bonus_allocations.entry(token).write(current_token_bonus + amount);
+            self._record_transaction(token, amount, TransactionType::BONUS_ALLOCATION, address);
         }
 
         /// Freezes all vault operations as a security measure.
@@ -288,7 +299,7 @@ pub mod Vault {
         fn emergency_freeze(ref self: ContractState) {
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
-            assert(permitted, 'Caller not permitted');
+            assert(permitted, 'Direct Caller not permitted');
             assert(self.vault_status.read() != VaultStatus::VAULTFROZEN, 'Vault Already Frozen');
 
             self.vault_status.write(VaultStatus::VAULTFROZEN);
@@ -302,80 +313,156 @@ pub mod Vault {
         fn unfreeze_vault(ref self: ContractState) {
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
-            assert(permitted, 'Caller not permitted');
+            assert(permitted, 'Direct Caller not permitted');
             assert(self.vault_status.read() != VaultStatus::VAULTRESUMED, 'Vault Not Frozen');
 
             self.vault_status.write(VaultStatus::VAULTRESUMED);
         }
 
-        // fn bulk_transfer(ref self: ContractState, recipients: Span<ContractAddress>) {}
-
-        /// Returns the vault's total balance of the managed token.
-        ///
-        /// ### Returns
-        /// - `u256`: The total balance.
-        fn get_balance(self: @ContractState) -> u256 {
-            // let caller = get_caller_address();
-            // assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
-            let token_address = self.token.read();
-            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            let vault_address = get_contract_address();
-            let balance = token_dispatcher.balance_of(vault_address);
-            balance
-        }
-
-        /// Returns the funds currently available for use.
-        ///
-        /// ### Returns
-        /// - `u256`: The available fund balance.
-        fn get_available_funds(self: @ContractState) -> u256 {
-            self.available_funds.read()
-        }
-
-        /// Returns the total amount allocated for bonuses.
-        ///
-        /// ### Returns
-        /// - `u256`: The bonus allocation amount.
-        fn get_bonus_allocation(self: @ContractState) -> u256 {
-            // let caller = get_caller_address();
-            // assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
-            self.total_bonus.read()
-        }
-
-        /// Pays a member from the vault's funds.
+        /// Executes a payment from the vault to a specific address using a specified token.
         ///
         /// ### Parameters
-        /// - `recipient`: The address of the member to pay.
-        /// - `amount`: The amount of the payment.
+        /// - `token`: The `ContractAddress` of the token for the payment.
+        /// - `recipient`: The `ContractAddress` of the member to receive the payment.
+        /// - `amount`: The payment amount as a `u256`.
         ///
         /// ### Panics
         /// - If `recipient` or `amount` is zero.
+        /// - If the `token` is not on the accepted list.
         /// - If the caller is not a permitted address.
-        /// - If the payment amount exceeds the vault's balance.
+        /// - If the payment `amount` exceeds the vault's balance for that token.
         /// - If the token transfer fails.
-        fn pay_member(ref self: ContractState, recipient: ContractAddress, amount: u256) {
+        fn pay_member(
+            ref self: ContractState,
+            token: ContractAddress,
+            recipient: ContractAddress,
+            amount: u256,
+        ) {
             assert(recipient.is_non_zero(), 'Invalid Address');
             assert(amount.is_non_zero(), 'Invalid Amount');
+            assert(self.is_token_acceptable(token), 'Token not accepted');
+
             let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller Not Permitted');
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
 
-            self._sync_available_funds();
+            let token_balance = self.get_token_balance(token);
+            assert(amount <= token_balance, 'Amount exceeds balance');
 
-            let token_address = self.token.read();
-            let token = IERC20Dispatcher { contract_address: token_address };
-            let token_balance = token.balance_of(get_contract_address());
-            assert(amount <= token_balance, 'Amount Overflow');
-            let transfer = token.transfer(recipient, amount);
-            assert(transfer, 'Transfer failed');
-            self._record_transaction(token_address, amount, TransactionType::PAYMENT, caller);
+            let token_dispatcher = IERC20Dispatcher { contract_address: token };
+            let transfered = token_dispatcher.transfer(recipient, amount);
+            assert(transfered, 'Transfer failed');
 
-            self._sync_available_funds();
+            self._record_transaction(token, amount, TransactionType::PAYMENT, caller);
         }
 
-        /// Returns the current status of the vault.
+        /// Adds a new ERC20 token to the list of accepted tokens for the vault. (Owner only)
+        ///
+        /// ### Parameters
+        /// - `token`: The `ContractAddress` of the token to be accepted.
+        ///
+        /// ### Panics
+        /// - If the caller is not the contract owner.
+        /// - If the `token` address is zero.
+        /// - If the `token` has already been accepted.
+        fn add_accepted_token(ref self: ContractState, token: ContractAddress) {
+            let caller = get_caller_address();
+
+            assert(token.is_non_zero(), 'Invalid token address');
+            assert(!self.is_token_acceptable(token), 'Token already accepted');
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
+
+            self.accepted_tokens.entry(token).write(true);
+            self.accepted_tokens_list.push(token);
+            self.emit(TokenAccepted { added_by: get_caller_address(), token });
+        }
+
+        /// Removes an ERC20 token from the list of accepted tokens for the vault. (Owner only)
+        ///
+        /// ### Parameters
+        /// - `token`: The `ContractAddress` of the token to be removed.
+        fn remove_accepted_token(ref self: ContractState, token: ContractAddress) {
+            let caller = get_caller_address();
+            assert(self.is_token_acceptable(token), 'Token not accepted');
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
+
+            self.accepted_tokens.entry(token).write(false);
+            self.emit(TokenRemoved { removed_by: get_caller_address(), token });
+        }
+
+        /// Retrieves the total balance of a specific token held by the vault.
+        ///
+        /// ### Parameters
+        /// - `token`: The `ContractAddress` of the token to query.
         ///
         /// ### Returns
-        /// - `VaultStatus`: The vault's current status enum.
+        /// - `u256`: The total balance of the specified token.
+        fn get_token_balance(self: @ContractState, token: ContractAddress) -> u256 {
+            let token_dispatcher = IERC20Dispatcher { contract_address: token };
+            token_dispatcher.balance_of(get_contract_address())
+        }
+
+        /// Retrieves a list of all tokens the vault is authorized to manage.
+        ///
+        /// ### Returns
+        /// - `Array<ContractAddress>`: A list of accepted token contract addresses.
+        fn get_accepted_tokens(self: @ContractState) -> Array<ContractAddress> {
+            let mut accepted_tokens: Array<ContractAddress> = array![];
+            let mut i = 0;
+
+            while i != self.accepted_tokens_list.len() {
+                let token_addr = self.accepted_tokens_list.at(i).read();
+
+                if self.is_token_acceptable(token_addr) {
+                    accepted_tokens.append(token_addr);
+                }
+
+                i += 1;
+            }
+
+            accepted_tokens
+        }
+
+        /// Retrieves the vault's balance for every accepted token.
+        ///
+        /// ### Returns
+        /// - `Array<(ContractAddress, u256)>`: A list of tuples, each containing a token address
+        /// and its corresponding balance.
+        fn get_all_token_balances(self: @ContractState) -> Array<(ContractAddress, u256)> {
+            let mut all_balances = array![];
+            let mut i = 0;
+            let this_contract = get_contract_address();
+
+            while i != self.accepted_tokens_list.len() {
+                let token_addr = self.accepted_tokens_list.at(i).read();
+
+                if self.is_token_acceptable(token_addr) {
+                    let token_dispatcher = IERC20Dispatcher { contract_address: token_addr };
+                    let balance = token_dispatcher.balance_of(this_contract);
+
+                    all_balances.append((token_addr, balance));
+                }
+
+                i += 1;
+            }
+
+            all_balances
+        }
+
+        /// Retrieves the current total amount allocated for bonuses for a specific token.
+        ///
+        /// ### Parameters
+        /// - `token`: The `ContractAddress` of the token to query.
+        ///
+        /// ### Returns
+        /// - `u256`: The bonus allocation for the specified token.
+        fn get_bonus_allocation(self: @ContractState, token: ContractAddress) -> u256 {
+            self.bonus_allocations.entry(token).read()
+        }
+
+        /// Returns the current operational status of the vault.
+        ///
+        /// ### Returns
+        /// - `VaultStatus`: The vault's current status enum (e.g., `VAULTACTIVE`, `VAULTFROZEN`).
         fn get_vault_status(self: @ContractState) -> VaultStatus {
             self.vault_status.read()
         }
@@ -406,6 +493,17 @@ pub mod Vault {
             assert(org_address.is_non_zero(), 'Invalid Address');
             self.permitted_addresses.entry(org_address).write(true);
         }
+
+        /// Checks whether a specific token is accepted by the vault for transactions.
+        ///
+        /// ### Parameters
+        /// - `token`: The `ContractAddress` of the token to check.
+        ///
+        /// ### Returns
+        /// - `bool`: `true` if the token is accepted, `false` otherwise.
+        fn is_token_acceptable(self: @ContractState, token: ContractAddress) -> bool {
+            self.accepted_tokens.entry(token).read()
+        }
     }
 
     /// # InternalFunctions
@@ -422,7 +520,7 @@ pub mod Vault {
         /// - If the caller is not a permitted address.
         fn _add_transaction(ref self: ContractState, transaction: Transaction) {
             let caller = get_caller_address();
-            assert(self.permitted_addresses.entry(caller).read(), 'Caller not permitted');
+            assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
             let current_transaction_count = self.transactions_count.read();
             self.transaction_history.entry(current_transaction_count + 1).write(transaction);
             self.transactions_count.write(current_transaction_count + 1);
@@ -446,7 +544,9 @@ pub mod Vault {
             caller: ContractAddress,
         ) {
             let actual_caller = get_caller_address();
-            assert(self.permitted_addresses.entry(actual_caller).read(), 'Caller Not Permitted');
+            assert(
+                self.permitted_addresses.entry(actual_caller).read(), 'Direct Caller not permitted',
+            );
             let timestamp = get_block_timestamp();
             let tx_info = get_tx_info();
             let transaction = Transaction {
@@ -467,16 +567,6 @@ pub mod Vault {
                         token: token_address,
                     },
                 );
-        }
-
-        /// Updates the `available_funds` storage variable to match the contract's actual token
-        /// balance.
-        fn _sync_available_funds(ref self: ContractState) {
-            let token_address = self.token.read();
-            let token_dispatcher = IERC20Dispatcher { contract_address: token_address };
-            let vault_address = get_contract_address();
-            let actual_balance = token_dispatcher.balance_of(vault_address);
-            self.available_funds.write(actual_balance);
         }
     }
 }
