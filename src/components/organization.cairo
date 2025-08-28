@@ -16,7 +16,13 @@ pub mod OrganizationComponent {
         OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
-
+    use core::array::{ArrayTrait, SpanTrait};
+    use super::super::permission_manager::PermissionManagerComponent;
+    use super::super::permission_manager::PermissionManagerComponent::Role;
+    use super::super::permission_manager::PermissionManagerComponent::PermissionInternalTrait;
+    use core::option::OptionTrait;
+    use core::array::array;
+    use core::traits::Into;
 
     /// Defines the storage layout for the `OrganizationComponent`.
     #[storage]
@@ -26,9 +32,9 @@ pub mod OrganizationComponent {
         /// Maps a committee member's address to their power level or rank.
         pub commitee: Map<ContractAddress, u16>, // address -> level of power
         /// The configuration node for the organization.
-        pub config: OrganizationConfigNode, // refactor to OrganizationConfig
+        pub config: Mutable<OrganizationConfigNode>, // refactor to OrganizationConfig
         /// Struct containing the core information of the organization.
-        pub org_info: OrganizationInfo,
+        pub org_info: Mutable<OrganizationInfo>,
     }
 
     /// Events emitted by the `OrganizationComponent`.
@@ -45,6 +51,7 @@ pub mod OrganizationComponent {
         +HasComponent<TContractState>,
         +Drop<TContractState>,
         impl Member: MemberManagerComponent::HasComponent<TContractState>,
+        impl Permission: PermissionManagerComponent::HasComponent<TContractState>,
     > of IOrganization<ComponentState<TContractState>> {
         /// Transfers the claim of the organization to a new address.
         ///
@@ -55,7 +62,16 @@ pub mod OrganizationComponent {
         /// - `to`: The address of the new owner.
         fn transfer_organization_claim(
             ref self: ComponentState<TContractState>, to: ContractAddress,
-        ) {}
+        ) {
+            // only OWNER can transfer Ownership
+            let caller = get_caller_address();
+            let is_owner = self.permission_manager.internal._has_permission(caller, Permission::GRANT_ADMIN);
+            assert(is_owner, 'Org: not owner');
+
+            let mut org_info=self.org_info.read();
+            org_info.owner=to;
+            self.org_info.write(org_info);
+        }
 
         /// Adjusts the organization's committee by adding or removing members.
         ///
@@ -68,9 +84,34 @@ pub mod OrganizationComponent {
         /// - `subtract`: An array of addresses to remove from the committee.
         fn adjust_committee(
             ref self: ComponentState<TContractState>,
-            add: Array<ContractAddress>,
-            subtract: Array<ContractAddress>,
+            add: Span<ContractAddress>,
+            subtract: Span<ContractAddress>,
         ) { // any one subtracted, power would be taken down to zero.
+            // only ADMIN or OWNER can modify committee
+             let caller = get_caller_address();
+            let can_add = self.permission_manager.internal._has_permission(caller, Permission::ADD_MEMBER);
+            let can_remove = self.permission_manager.internal._has_permission(caller, Permission::REMOVE_MEMBER);
+            assert(can_add || can_remove, 'Org: not authorized');
+            let mut add_iter = add.iter();
+            loop {
+                match add_iter.next() {
+                    Option::Some(addr) => {
+                        self.commitee.write(*addr, 1);
+                    },
+                    Option::None => { break; }
+                }
+            };
+
+            let mut subtract_iter = subtract.iter();
+            loop {
+                match subtract_iter.next() {
+                    Option::Some(addr) => {
+                        self.commitee.write(*addr, 0);
+                    },
+                    Option::None => { break; }
+                }
+            };
+
         }
 
         /// Updates the organization's configuration.
@@ -82,7 +123,14 @@ pub mod OrganizationComponent {
         /// - `config`: The new organization configuration.
         fn update_organization_config(
             ref self: ComponentState<TContractState>, config: OrganizationConfig,
-        ) {}
+        ) {
+            let caller = get_caller_address();
+            let can_update = self.permission_manager.internal._has_permission(caller, Permission::SET_SALARIES);
+            assert(can_update, 'Org: not authorized');
+            
+            self.config.write(config.into());
+           
+        }
 
         /// Retrieves the core details of the organization.
         ///
