@@ -106,8 +106,8 @@ pub mod MemberManagerComponent {
             member.details.write(details);
             member.member.write(new_member);
             member.reg_time.write(reg_time);
-            member.total_received.write(Option::Some(0));
-            member.total_disbursements.write(Option::Some(0));
+            member.total_received.write(0);
+            member.total_disbursements.write(0);
             self.member_count.write(id);
 
             let factory_dispatcher = IFactoryDispatcher { contract_address: self.factory.read() };
@@ -371,12 +371,12 @@ pub mod MemberManagerComponent {
             let mut member_node = self.members.entry(member_id);
             member_node
                 .total_received
-                .write(Option::Some(member_node.total_received.read().unwrap() + 1));
+                .write(member_node.total_received.read() + 1);
             member_node.no_of_payouts.write(member_node.no_of_payouts.read() + 1);
-            member_node.last_disbursement_timestamp.write(Option::Some(timestamp));
+            member_node.last_disbursement_timestamp.write(timestamp);
             member_node
                 .total_disbursements
-                .write(Option::Some(member_node.total_disbursements.read().unwrap() + 1));
+                .write(member_node.total_disbursements.read() + 1);
         }
 
         /// Returns the address of the factory contract.
@@ -441,8 +441,8 @@ pub mod MemberManagerComponent {
             new_admin_node.details.write(new_admin_details);
             new_admin_node.member.write(new_admin);
             new_admin_node.reg_time.write(reg_time);
-            new_admin_node.total_received.write(Option::Some(0));
-            new_admin_node.total_disbursements.write(Option::Some(0));
+            new_admin_node.total_received.write(0);
+            new_admin_node.total_disbursements.write(0);
 
             self.admin_ca.entry(caller).write(true);
             self.admin_ca.entry(owner).write(true);

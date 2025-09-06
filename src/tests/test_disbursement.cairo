@@ -45,11 +45,11 @@ fn create_test_member_response() -> MemberResponse {
         address: member(),
         status: MemberStatus::ACTIVE,
         base_pay: 50000,
-        pending_allocations: Option::Some(1000),
-        total_received: Option::Some(10000),
+        pending_allocations: 1000,
+        total_received: 10000,
         no_of_payouts: 2,
-        last_disbursement_timestamp: Option::Some(1500),
-        total_disbursements: Option::Some(5),
+        last_disbursement_timestamp: 1500,
+        total_disbursements: 5,
         reg_time: 1000,
     }
 }
