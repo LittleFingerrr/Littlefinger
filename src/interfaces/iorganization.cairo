@@ -1,5 +1,5 @@
 use starknet::ContractAddress;
-use crate::structs::organization::{OrganizationConfig, OrganizationInfo};
+use crate::structs::organization::{Contract, ContractType, OrganizationConfig, OrganizationInfo};
 
 // Some functions here might require multiple signing to execute.
 /// # IOrganization
@@ -55,4 +55,38 @@ pub trait IOrganization<TContractState> {
     ///
     /// An `OrganizationInfo` struct containing the organization's details.
     fn get_organization_details(self: @TContractState) -> OrganizationInfo;
+
+    // fn create_contract(
+    //     ref self: TContractState,
+    //     contract_type: ContractType,
+    //     parties: Array<ContractAddress>,
+    //     ipfs_hash: felt252,
+    //     expiry: Option<u64>,
+    // );
+
+    fn create_company_to_member_contract(
+        ref self: TContractState,
+        contract_type: ContractType,
+        member_id: u256,
+        ipfs_hash: felt252,
+        expiry: Option<u64>,
+    );
+
+    fn create_company_to_partner_contract(
+        ref self: TContractState,
+        contract_type: ContractType,
+        partner_address: ContractAddress,
+        ipfs_hash: felt252,
+        expiry: Option<u64>,
+    );
+
+    fn sign_contract(ref self: TContractState, contract_id: u256, signature: Array<felt252>);
+
+    fn update_contract(
+        ref self: TContractState, contract_id: u256, new_ipfs_hash: felt252, expiry: Option<u64>,
+    );
+
+    fn terminate_contract(ref self: TContractState, contract_id: u256, signature: Array<felt252>);
+
+    fn get_contract(self: @TContractState, contract_id: u256) -> Contract;
 }

@@ -388,6 +388,13 @@ pub mod MemberManagerComponent {
         fn get_core_org_address(self: @ComponentState<TContractState>) -> ContractAddress {
             self.core_org.read()
         }
+
+        fn is_admin(
+            self: @ComponentState<TContractState>, member_address: ContractAddress,
+        ) -> bool {
+            let caller = get_caller_address();
+            self.admin_ca.entry(caller).read()
+        }
     }
 
     /// # InternalImpl
