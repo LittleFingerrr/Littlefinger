@@ -30,7 +30,7 @@ mod Core {
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::storage::StoragePointerWriteAccess;
     use starknet::{
-        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
+        ClassHash, ContractAddress, get_block_timestamp, get_contract_address,
     };
     use crate::interfaces::imember_manager::IMemberManager;
 
@@ -158,9 +158,6 @@ mod Core {
                 deployer,
                 organization_type,
             );
-        // MemberManagerComponent::InternalImpl::_initialize(
-        //     ref self.member, first_admin_fname, first_admin_lname, first_admin_alias
-        // )
         self
             .member
             ._initialize(
@@ -173,9 +170,6 @@ mod Core {
             );
         self.vault_address.write(vault_address);
         self.disbursement._init(owner);
-        // self.disbursement._add_authorized_caller(deployer);
-        // let this_contract = get_contract_address();
-        // self.disbursement._add_authorized_caller(this_contract);
         self.ownable.initializer(owner);
     }
 
@@ -215,7 +209,6 @@ mod Core {
         fn initialize_disbursement_schedule(
             ref self: ContractState,
             schedule_type: u8,
-            //schedule_id: felt252,
             start: u64, //timestamp
             end: u64,
             interval: u64,
@@ -235,7 +228,6 @@ mod Core {
         /// - If the payout is attempted before the required interval has passed since the last
         /// execution.
         fn schedule_payout(ref self: ContractState, token: ContractAddress) {
-            let caller = get_caller_address();
             let members = self.member.get_members();
             let no_of_members = members.len();
 
@@ -244,7 +236,6 @@ mod Core {
 
             let vault_dispatcher = IVaultDispatcher { contract_address: vault_address };
             let total_bonus = vault_dispatcher.get_bonus_allocation(token);
-            let total_funds = vault_dispatcher.get_token_balance(token);
 
             let current_schedule = self.disbursement.get_current_schedule();
             assert(current_schedule.status == ScheduleStatus::ACTIVE, 'Schedule not active');
@@ -259,8 +250,6 @@ mod Core {
                     'Payout premature',
                 );
             }
-
-            // let mut failed_disbursements = array![];
 
             // Everyone uses a base weight multiplier at the start, of 1
             let mut total_weight: u16 = 0;
@@ -278,12 +267,13 @@ mod Core {
                 //     role: current_member_response.role,
                 //     // base_pay: current_member_response.base_pay,
                 // };
+                let timestamp = get_block_timestamp();
                 let amount = self
                     .disbursement
                     .compute_renumeration(current_member_response, total_bonus, total_weight);
                 let timestamp = get_block_timestamp();
                 vault_dispatcher.pay_member(token, current_member_response.address, amount);
-                // self.member.record_member_payment(current_member_response.id, amount, timestamp)
+                self.member.record_member_payment(current_member_response.id,amount,timestamp);
             }
 
             self.disbursement.update_current_schedule_last_execution(now);

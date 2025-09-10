@@ -16,11 +16,11 @@ pub struct MemberResponse {
     // The base pay is agreed between the member and the company at the beginning of their work
     // together i.e. during registration
     pub base_pay: u256,
-    pub pending_allocations: Option<u256>,
-    pub total_received: Option<u256>,
+    pub pending_allocations: u256,
+    pub total_received: u256,
     pub no_of_payouts: u32,
-    pub last_disbursement_timestamp: Option<u64>,
-    pub total_disbursements: Option<u64>,
+    pub last_disbursement_timestamp: u64,
+    pub total_disbursements: u64,
     pub reg_time: u64,
 }
 
@@ -63,11 +63,11 @@ pub struct MemberNode {
     pub details: MemberDetails,
     pub member: Member,
     pub base_pay: u256,
-    pub pending_allocations: Option<u256>,
-    pub total_received: Option<u256>,
+    pub pending_allocations: u256,
+    pub total_received: u256,
     pub no_of_payouts: u32,
-    pub last_disbursement_timestamp: Option<u64>,
-    pub total_disbursements: Option<u64>,
+    pub last_disbursement_timestamp: u64,
+    pub total_disbursements: u64,
     pub reg_time: u64,
 }
 

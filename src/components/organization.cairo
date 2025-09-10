@@ -7,22 +7,15 @@
 /// - Ownership transfers.
 #[starknet::component]
 pub mod OrganizationComponent {
-    use starknet::storage::{Map, StoragePointerReadAccess, StoragePointerWriteAccess};
+    use starknet::storage::{Map, StoragePathEntry,StoragePointerReadAccess, StoragePointerWriteAccess};
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     // use crate::interfaces::icore::IConfig;
     use crate::interfaces::iorganization::IOrganization;
     // use crate::structs::member_structs::MemberTrait;
     use crate::structs::organization::{
-        OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType,
+        Contract, ContractParties, ContractStatus, ContractType,OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
-    use core::array::{ArrayTrait, SpanTrait};
-    use super::super::permission_manager::PermissionManagerComponent;
-    use super::super::permission_manager::PermissionManagerComponent::Role;
-    use super::super::permission_manager::PermissionManagerComponent::PermissionInternalTrait;
-    use core::option::OptionTrait;
-    use core::array::array;
-    use core::traits::Into;
 
     /// Defines the storage layout for the `OrganizationComponent`.
     #[storage]
@@ -32,9 +25,13 @@ pub mod OrganizationComponent {
         /// Maps a committee member's address to their power level or rank.
         pub commitee: Map<ContractAddress, u16>, // address -> level of power
         /// The configuration node for the organization.
-        pub config: Mutable<OrganizationConfigNode>, // refactor to OrganizationConfig
+        pub config: OrganizationConfigNode, // refactor to OrganizationConfig
         /// Struct containing the core information of the organization.
-        pub org_info: Mutable<OrganizationInfo>,
+        pub org_info: OrganizationInfo,
+        /// Maps an id to a contract
+        pub contracts: Map<u256, Contract>,
+        /// Contract counter
+        pub contract_counter: u64,
     }
 
     /// Events emitted by the `OrganizationComponent`.
@@ -51,7 +48,6 @@ pub mod OrganizationComponent {
         +HasComponent<TContractState>,
         +Drop<TContractState>,
         impl Member: MemberManagerComponent::HasComponent<TContractState>,
-        impl Permission: PermissionManagerComponent::HasComponent<TContractState>,
     > of IOrganization<ComponentState<TContractState>> {
         /// Transfers the claim of the organization to a new address.
         ///
@@ -62,16 +58,7 @@ pub mod OrganizationComponent {
         /// - `to`: The address of the new owner.
         fn transfer_organization_claim(
             ref self: ComponentState<TContractState>, to: ContractAddress,
-        ) {
-            // only OWNER can transfer Ownership
-            let caller = get_caller_address();
-            let is_owner = self.permission_manager.internal._has_permission(caller, Permission::GRANT_ADMIN);
-            assert(is_owner, 'Org: not owner');
-
-            let mut org_info=self.org_info.read();
-            org_info.owner=to;
-            self.org_info.write(org_info);
-        }
+        ) {}
 
         /// Adjusts the organization's committee by adding or removing members.
         ///
@@ -84,33 +71,10 @@ pub mod OrganizationComponent {
         /// - `subtract`: An array of addresses to remove from the committee.
         fn adjust_committee(
             ref self: ComponentState<TContractState>,
-            add: Span<ContractAddress>,
-            subtract: Span<ContractAddress>,
+            add: Array<ContractAddress>,
+            subtract: Array<ContractAddress>,
         ) { // any one subtracted, power would be taken down to zero.
-            // only ADMIN or OWNER can modify committee
-             let caller = get_caller_address();
-            let can_add = self.permission_manager.internal._has_permission(caller, Permission::ADD_MEMBER);
-            let can_remove = self.permission_manager.internal._has_permission(caller, Permission::REMOVE_MEMBER);
-            assert(can_add || can_remove, 'Org: not authorized');
-            let mut add_iter = add.iter();
-            loop {
-                match add_iter.next() {
-                    Option::Some(addr) => {
-                        self.commitee.write(*addr, 1);
-                    },
-                    Option::None => { break; }
-                }
-            };
-
-            let mut subtract_iter = subtract.iter();
-            loop {
-                match subtract_iter.next() {
-                    Option::Some(addr) => {
-                        self.commitee.write(*addr, 0);
-                    },
-                    Option::None => { break; }
-                }
-            };
+            
 
         }
 
@@ -123,14 +87,7 @@ pub mod OrganizationComponent {
         /// - `config`: The new organization configuration.
         fn update_organization_config(
             ref self: ComponentState<TContractState>, config: OrganizationConfig,
-        ) {
-            let caller = get_caller_address();
-            let can_update = self.permission_manager.internal._has_permission(caller, Permission::SET_SALARIES);
-            assert(can_update, 'Org: not authorized');
-            
-            self.config.write(config.into());
-           
-        }
+        ) {}
 
         /// Retrieves the core details of the organization.
         ///
@@ -139,7 +96,112 @@ pub mod OrganizationComponent {
         fn get_organization_details(self: @ComponentState<TContractState>) -> OrganizationInfo {
             self.org_info.read()
         }
+         /// Creates an employee contract, to be given at hiring, or updated during employment
+        /// Show to employee at hiring
+        fn create_company_to_member_contract(
+            ref self: ComponentState<TContractState>,
+            contract_type: ContractType,
+            member_id: u256,
+            ipfs_hash: felt252,
+            expiry: Option<u64>,
+        ) {
+            let member_component = get_dep_component!(@self, Member);
+            let caller = get_caller_address();
+            let is_admin = member_component.admin_ca.entry(caller).read();
+            assert(is_admin, 'Caller Not Permitted');
+
+            let contract = Contract {
+                id: self.contract_counter.read().into(),
+                hash: ipfs_hash,
+                version: 1,
+                signed_time: 0,
+                contract_parties: ContractParties::COMPANY_MEMBER(member_id),
+                status: ContractStatus::PROPOSED,
+                expiry_time: Option::None,
+            };
+
+            self.contracts.entry(self.contract_counter.read().into()).write(contract);
+            self.contract_counter.write(self.contract_counter.read() + 1);
+        }
+
+        /// Creates a contract between two companies using Littlefinger. Advanced features
+        /// Show to both companies
+        fn create_company_to_partner_contract(
+            ref self: ComponentState<TContractState>,
+            contract_type: ContractType,
+            partner_address: ContractAddress,
+            ipfs_hash: felt252,
+            expiry: Option<u64>,
+        ) {
+            let member_component = get_dep_component!(@self, Member);
+            let caller = get_caller_address();
+            let is_admin = member_component.admin_ca.entry(caller).read();
+            assert(is_admin, 'Caller Not Permitted');
+
+            let contract = Contract {
+                id: self.contract_counter.read().into(),
+                hash: ipfs_hash,
+                version: 1,
+                signed_time: 0,
+                contract_parties: ContractParties::COMPANY_COMPANY(partner_address),
+                status: ContractStatus::PROPOSED,
+                expiry_time: Option::None,
+            };
+
+            self.contracts.entry(self.contract_counter.read().into()).write(contract);
+            self.contract_counter.write(self.contract_counter.read() + 1);
+        }
+
+        /// Used to accept a contract, by whoever is on the other side of the contract (recipeint)
+        /// Will implement Starknet message signing soon
+        fn sign_contract(
+            ref self: ComponentState<TContractState>, contract_id: u256, signature: Array<felt252>,
+        ) {
+            // ecdsa::check_ecdsa_signature()
+            let mut contract = self.contracts.entry(contract_id).read();
+            contract.status = ContractStatus::ACTIVE;
+            contract.signed_time = get_block_timestamp();
+
+            self.contracts.entry(contract_id).write(contract);
+        }
+
+        /// Updates a contract ipfs hash and version
+        /// Show to employee at hiring
+        fn update_contract(
+            ref self: ComponentState<TContractState>,
+            contract_id: u256,
+            new_ipfs_hash: felt252,
+            expiry: Option<u64>,
+        ) {
+            let mut contract = self.contracts.entry(contract_id).read();
+            contract.hash = new_ipfs_hash;
+
+            if expiry.is_some() {
+                contract.expiry_time = Option::Some(expiry.unwrap());
+            }
+            contract.version += 1;
+
+            self.contracts.entry(contract_id).write(contract);
+        }
+
+        /// Termminates a contract, can be used by employees or fellow companies
+        /// Mutual agreement between company and employee
+        fn terminate_contract(
+            ref self: ComponentState<TContractState>, contract_id: u256, signature: Array<felt252>,
+        ) {
+            let mut contract = self.contracts.entry(contract_id).read();
+            contract.status = ContractStatus::TERMINATED;
+        }
+
+        /// Used to get a contract ipfs hash for access purpose
+        /// ### Returns 
+        /// - Contract: all the important info of the contract suitable for storage onchain.
+        /// - The rest goes to IPFS
+        fn get_contract(self: @ComponentState<TContractState>, contract_id: u256) -> Contract {
+            self.contracts.entry(contract_id).read()
+        }
     }
+    
 
     /// # InternalImpl
     ///
