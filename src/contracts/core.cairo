@@ -191,8 +191,6 @@ mod Core {
 
     // TODO: ADD ADMIN FROM HERE
 
-    // TODO: DO TRANSFER FROM HERE WHEN YOU WANT TO PAYOUT
-
     /// # CoreImpl
     ///
     /// Public-facing implementation of the `ICore` interface.
@@ -271,9 +269,8 @@ mod Core {
                 let amount = self
                     .disbursement
                     .compute_renumeration(current_member_response, total_bonus, total_weight);
-                let timestamp = get_block_timestamp();
                 vault_dispatcher.pay_member(token, current_member_response.address, amount);
-                self.member.record_member_payment(current_member_response.id,amount,timestamp);
+                self.member.record_member_payment(current_member_response.id, amount, timestamp);
             }
 
             self.disbursement.update_current_schedule_last_execution(now);

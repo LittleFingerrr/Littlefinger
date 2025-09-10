@@ -4,16 +4,18 @@
 /// - Storing fundamental organization information (name, ID, owner, etc.).
 /// - Managing a committee of privileged addresses.
 /// - Handling organization-level configuration.
+/// - Handling members' and interorganization business contracts
 /// - Ownership transfers.
 #[starknet::component]
 pub mod OrganizationComponent {
     use starknet::storage::{Map, StoragePathEntry,StoragePointerReadAccess, StoragePointerWriteAccess};
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
-    // use crate::interfaces::icore::IConfig;
+    // use core::ec::stark_curve;
+    // use core::ecdsa;
     use crate::interfaces::iorganization::IOrganization;
-    // use crate::structs::member_structs::MemberTrait;
     use crate::structs::organization::{
-        Contract, ContractParties, ContractStatus, ContractType,OrganizationConfig, OrganizationConfigNode, OrganizationInfo, OrganizationType,
+        Contract, ContractParties, ContractStatus, ContractType, OrganizationConfig,
+        OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
 
@@ -96,7 +98,8 @@ pub mod OrganizationComponent {
         fn get_organization_details(self: @ComponentState<TContractState>) -> OrganizationInfo {
             self.org_info.read()
         }
-         /// Creates an employee contract, to be given at hiring, or updated during employment
+
+        /// Creates an employee contract, to be given at hiring, or updated during employment
         /// Show to employee at hiring
         fn create_company_to_member_contract(
             ref self: ComponentState<TContractState>,

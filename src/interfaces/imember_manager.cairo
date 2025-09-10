@@ -229,5 +229,4 @@ pub trait IMemberManager<TContractState> {
 
     // ALLOCATION WEIGHT MANAGEMENT (PROMOTION & DEMOTION)
     fn is_admin(self: @TContractState, member_address: ContractAddress) -> bool;
-
 }

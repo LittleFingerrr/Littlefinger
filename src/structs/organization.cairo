@@ -97,3 +97,4 @@ impl ContractImpl of ContractTrait {
         default_contract
     }
 }
+
