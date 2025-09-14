@@ -29,9 +29,7 @@ mod Core {
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::storage::StoragePointerWriteAccess;
-    use starknet::{
-        ClassHash, ContractAddress, get_block_timestamp, get_contract_address,
-    };
+    use starknet::{ClassHash, ContractAddress, get_block_timestamp, get_contract_address};
     use crate::interfaces::imember_manager::IMemberManager;
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);

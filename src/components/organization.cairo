@@ -198,7 +198,7 @@ pub mod OrganizationComponent {
         }
 
         /// Used to get a contract ipfs hash for access purpose
-        /// ### Returns 
+        /// ### Returns
         /// - Contract: all the important info of the contract suitable for storage onchain.
         /// - The rest goes to IPFS
         fn get_contract(self: @ComponentState<TContractState>, contract_id: u256) -> Contract {

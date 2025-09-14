@@ -369,14 +369,10 @@ pub mod MemberManagerComponent {
             ref self: ComponentState<TContractState>, member_id: u256, amount: u256, timestamp: u64,
         ) {
             let mut member_node = self.members.entry(member_id);
-            member_node
-                .total_received
-                .write(member_node.total_received.read() + 1);
+            member_node.total_received.write(member_node.total_received.read() + 1);
             member_node.no_of_payouts.write(member_node.no_of_payouts.read() + 1);
             member_node.last_disbursement_timestamp.write(timestamp);
-            member_node
-                .total_disbursements
-                .write(member_node.total_disbursements.read() + 1);
+            member_node.total_disbursements.write(member_node.total_disbursements.read() + 1);
         }
 
         /// Returns the address of the factory contract.
