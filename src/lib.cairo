@@ -5,6 +5,7 @@ pub mod contracts {
 }
 pub mod interfaces {
     pub mod dao_controller;
+    pub mod iadmin_permission_manager;
     pub mod icore;
     pub mod idisbursement;
     pub mod ifactory;
@@ -14,6 +15,7 @@ pub mod interfaces {
 }
 
 pub mod components {
+    pub mod admin_permission_manager;
     pub mod dao_controller;
     pub mod disbursement;
     pub mod member_manager;
@@ -21,6 +23,7 @@ pub mod components {
 }
 
 pub mod structs {
+    pub mod admin_permissions;
     pub mod base;
     pub mod core;
     pub mod dao_controller;
@@ -32,10 +35,12 @@ pub mod structs {
 
 #[cfg(test)]
 pub mod tests {
+    pub mod test_admin_permission_manager;
     pub mod test_dao_controller;
     pub mod test_disbursement;
     pub mod test_member_manager;
     pub mod mocks {
+        pub mod mock_admin_permission_manager;
         pub mod mock_dao_controller;
         pub mod mock_disbursement;
         pub mod mock_member_manager;
