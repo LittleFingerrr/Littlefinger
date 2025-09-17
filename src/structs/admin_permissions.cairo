@@ -9,6 +9,7 @@ pub enum AdminPermission {
     SET_BASE_SALARIES,
     CHANGE_BASE_SALARIES,
     SET_DISBURSEMENT_SCHEDULES,
+    PAY_MEMBERS, // Permission to execute scheduled payouts
     ADD_VAULT_TOKENS,
     VAULT_FUNCTIONS, // All vault functions except deposit
     GRANT_ADMIN_STATUS,
@@ -27,6 +28,7 @@ pub impl AdminPermissionIntoFelt252 of Into<AdminPermission, felt252> {
             AdminPermission::SET_BASE_SALARIES => 'SET_SALARIES',
             AdminPermission::CHANGE_BASE_SALARIES => 'CHANGE_SALARIES',
             AdminPermission::SET_DISBURSEMENT_SCHEDULES => 'SET_SCHEDULES',
+            AdminPermission::PAY_MEMBERS => 'PAY_MEMBERS',
             AdminPermission::ADD_VAULT_TOKENS => 'ADD_VAULT_TOKENS',
             AdminPermission::VAULT_FUNCTIONS => 'VAULT_FUNCTIONS',
             AdminPermission::GRANT_ADMIN_STATUS => 'GRANT_ADMIN_STATUS',
@@ -52,6 +54,8 @@ pub impl Felt252IntoAdminPermission of Into<felt252, AdminPermission> {
             AdminPermission::CHANGE_BASE_SALARIES
         } else if self == 'SET_SCHEDULES' {
             AdminPermission::SET_DISBURSEMENT_SCHEDULES
+        } else if self == 'PAY_MEMBERS' {
+            AdminPermission::PAY_MEMBERS
         } else if self == 'ADD_VAULT_TOKENS' {
             AdminPermission::ADD_VAULT_TOKENS
         } else if self == 'VAULT_FUNCTIONS' {
@@ -86,12 +90,13 @@ pub impl AdminPermissionImpl of AdminPermissionTrait {
             AdminPermission::SET_BASE_SALARIES => 8,
             AdminPermission::CHANGE_BASE_SALARIES => 16,
             AdminPermission::SET_DISBURSEMENT_SCHEDULES => 32,
-            AdminPermission::ADD_VAULT_TOKENS => 64,
-            AdminPermission::VAULT_FUNCTIONS => 128,
-            AdminPermission::GRANT_ADMIN_STATUS => 256,
-            AdminPermission::REVOKE_ADMIN_STATUS => 512,
-            AdminPermission::GRANT_PERMISSIONS => 1024,
-            AdminPermission::REVOKE_PERMISSIONS => 2048,
+            AdminPermission::PAY_MEMBERS => 64,
+            AdminPermission::ADD_VAULT_TOKENS => 128,
+            AdminPermission::VAULT_FUNCTIONS => 256,
+            AdminPermission::GRANT_ADMIN_STATUS => 512,
+            AdminPermission::REVOKE_ADMIN_STATUS => 1024,
+            AdminPermission::GRANT_PERMISSIONS => 2048,
+            AdminPermission::REVOKE_PERMISSIONS => 4096,
         }
     }
 
@@ -107,6 +112,7 @@ pub impl AdminPermissionImpl of AdminPermissionTrait {
             AdminPermission::SET_BASE_SALARIES,
             AdminPermission::CHANGE_BASE_SALARIES,
             AdminPermission::SET_DISBURSEMENT_SCHEDULES,
+            AdminPermission::PAY_MEMBERS,
             AdminPermission::ADD_VAULT_TOKENS,
             AdminPermission::VAULT_FUNCTIONS,
             AdminPermission::GRANT_ADMIN_STATUS,

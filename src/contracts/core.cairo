@@ -251,9 +251,7 @@ mod Core {
         fn schedule_payout(ref self: ContractState, token: ContractAddress) {
             self
                 .admin_permission_manager
-                .require_admin_permission(
-                    get_caller_address(), AdminPermission::SET_DISBURSEMENT_SCHEDULES,
-                );
+                .require_admin_permission(get_caller_address(), AdminPermission::PAY_MEMBERS);
 
             let members = self.member.get_members();
             let no_of_members = members.len();
