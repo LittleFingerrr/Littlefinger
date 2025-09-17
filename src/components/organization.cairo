@@ -8,6 +8,7 @@
 /// - Ownership transfers.
 #[starknet::component]
 pub mod OrganizationComponent {
+    use MemberManagerComponent::MemberInternalTrait;
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
@@ -20,7 +21,6 @@ pub mod OrganizationComponent {
         OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
-    use MemberManagerComponent::MemberInternalTrait;
 
 
     /// Defines the storage layout for the `OrganizationComponent`.

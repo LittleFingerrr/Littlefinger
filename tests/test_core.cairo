@@ -1,3 +1,6 @@
+use littlefinger::interfaces::iadmin_permission_manager::{
+    IAdminPermissionManagerDispatcher, IAdminPermissionManagerDispatcherTrait,
+};
 use littlefinger::interfaces::icore::{ICoreDispatcher, ICoreDispatcherTrait};
 use littlefinger::interfaces::idisbursement::{
     IDisbursementDispatcher, IDisbursementDispatcherTrait,
@@ -7,6 +10,7 @@ use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
 use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
+use littlefinger::structs::admin_permissions::AdminPermission;
 use littlefinger::structs::disbursement_structs::{ScheduleStatus, ScheduleType};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
@@ -207,6 +211,15 @@ fn setup_full_organization() -> (
     start_cheat_caller_address(vault_address, owner);
     vault_dispatcher.deposit_funds(token_address, 5000000000000000000000, owner);
     vault_dispatcher.add_to_bonus_allocation(token_address, 1000000000000000000000, owner);
+    stop_cheat_caller_address(vault_address);
+
+    // Grant necessary permissions to the core contract for vault operations
+    let vault_admin_permission_manager = IAdminPermissionManagerDispatcher {
+        contract_address: vault_address,
+    };
+    start_cheat_caller_address(vault_address, owner);
+    vault_admin_permission_manager
+        .grant_admin_permission(core_address, AdminPermission::VAULT_FUNCTIONS);
     stop_cheat_caller_address(vault_address);
 
     (

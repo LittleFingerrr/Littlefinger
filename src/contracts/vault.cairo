@@ -12,9 +12,9 @@
 /// for future contract upgrades.
 #[starknet::contract]
 pub mod Vault {
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use core::num::traits::Zero;
     use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
-    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use littlefinger::interfaces::ivault::IVault;
     use littlefinger::structs::admin_permissions::AdminPermission;
     use littlefinger::structs::vault_structs::{Transaction, TransactionType, VaultStatus};
@@ -43,7 +43,7 @@ pub mod Vault {
         AdminPermissionManagerComponent::AdminPermissionManagerImpl<ContractState>;
     #[abi(embed_v0)]
     impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
-    
+
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 

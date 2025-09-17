@@ -14,10 +14,10 @@
 /// - `OwnableComponent` and `UpgradeableComponent`: For access control and contract upgrades.
 #[starknet::contract]
 mod Core {
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use MemberManagerComponent::MemberInternalTrait;
     use OrganizationComponent::OrganizationInternalTrait;
     use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
-    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use littlefinger::components::dao_controller::VotingComponent;
     use littlefinger::components::disbursement::DisbursementComponent;
     use littlefinger::components::member_manager::MemberManagerComponent;

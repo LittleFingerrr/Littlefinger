@@ -1,4 +1,8 @@
+use littlefinger::interfaces::iadmin_permission_manager::{
+    IAdminPermissionManagerDispatcher, IAdminPermissionManagerDispatcherTrait,
+};
 use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
+use littlefinger::structs::admin_permissions::AdminPermission;
 use littlefinger::structs::vault_structs::{TransactionType, VaultStatus};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
@@ -140,6 +144,16 @@ fn deploy_vault() -> (IVaultDispatcher, ContractAddress, ContractAddress, Contra
     vault_dispatcher.allow_org_core_address(permitted_caller());
     vault_dispatcher.allow_org_core_address(owner_address);
     vault_dispatcher.allow_org_core_address(recipient());
+
+    // Grant admin permissions to permitted_caller for testing
+    let admin_permission_manager = IAdminPermissionManagerDispatcher {
+        contract_address: vault_address,
+    };
+    admin_permission_manager
+        .grant_admin_permission(permitted_caller(), AdminPermission::VAULT_FUNCTIONS);
+    admin_permission_manager
+        .grant_admin_permission(permitted_caller(), AdminPermission::ADD_VAULT_TOKENS);
+
     stop_cheat_caller_address(vault_address);
 
     // Setup token1 approvals for all addresses
@@ -275,7 +289,7 @@ fn test_withdraw_funds_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Direct Caller not permitted')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_withdraw_funds_unauthorized_caller() {
     let (vault, vault_address, _token1_address, _) = deploy_vault();
 
@@ -337,7 +351,7 @@ fn test_emergency_freeze_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Direct Caller not permitted')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_emergency_freeze_unauthorized() {
     let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
@@ -373,7 +387,7 @@ fn test_unfreeze_vault_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Direct Caller not permitted')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_unfreeze_vault_unauthorized() {
     let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
@@ -422,7 +436,7 @@ fn test_pay_member_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Direct Caller not permitted')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_pay_member_unauthorized() {
     let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
@@ -451,7 +465,7 @@ fn test_add_to_bonus_allocation_success() {
 }
 
 #[test]
-#[should_panic(expected: 'Direct Caller not permitted')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_add_to_bonus_allocation_unauthorized() {
     let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 
@@ -692,7 +706,7 @@ fn test_remove_accepted_token() {
 }
 
 #[test]
-#[should_panic(expected: 'Direct Caller not permitted')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_remove_accepted_token_unauthorized() {
     let (vault, vault_address, _token1_address, _token2_address) = deploy_vault();
 

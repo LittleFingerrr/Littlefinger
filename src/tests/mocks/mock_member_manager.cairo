@@ -1,5 +1,6 @@
 #[starknet::contract]
 pub mod MockMemberManager {
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
     use littlefinger::components::member_manager::MemberManagerComponent;
     use starknet::ContractAddress;
@@ -49,6 +50,9 @@ pub mod MockMemberManager {
         factory: ContractAddress,
         core_org: ContractAddress,
     ) {
+        // Initialize admin permission manager first
+        self.admin_permission_manager.initialize_admin_permissions(admin);
+
         self
             .member_manager
             ._initialize(
