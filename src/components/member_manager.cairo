@@ -11,9 +11,12 @@
 #[starknet::component]
 pub mod MemberManagerComponent {
     use core::num::traits::Zero;
+    use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
+    use littlefinger::interfaces::iadmin_permission_manager::IAdminPermissionManager;
     use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
     // use littlefinger::interfaces::icore::IConfig;
     use littlefinger::interfaces::imember_manager::IMemberManager;
+    use littlefinger::structs::admin_permissions::AdminPermission;
     use littlefinger::structs::member_structs::{
         InviteAccepted, InviteStatus, Member, MemberConfig, MemberConfigNode, MemberDetails,
         MemberEnum, MemberInvite, MemberInvited, MemberNode, MemberResponse, MemberRole,
@@ -61,7 +64,9 @@ pub mod MemberManagerComponent {
     /// Public-facing implementation of the `IMemberManager` interface.
     #[embeddable_as(MemberManager)]
     pub impl MemberManagerImpl<
-        TContractState, +HasComponent<TContractState>,
+        TContractState,
+        +HasComponent<TContractState>,
+        impl Admin: AdminPermissionManagerComponent::HasComponent<TContractState>,
     > of IMemberManager<ComponentState<TContractState>> {
         /// Adds a new member to the organization.
         ///
@@ -83,6 +88,10 @@ pub mod MemberManagerComponent {
             // the function with their wallet actually.
             // This means that we'll have to put verify_member to add to it
             // Will have to find another means to hash the id, or not. Let us see how things go
+            let admin_permission_manager = get_dep_component!(@self, Admin);
+            admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::ADD_MEMBER);
+
             let caller = get_caller_address();
             let id: u256 = self.member_count.read() + 1;
             assert(!caller.is_zero(), 'Zero Address Caller');
@@ -119,6 +128,10 @@ pub mod MemberManagerComponent {
         /// ### Parameters
         /// - `member_id`: ID of the member to promote
         fn add_admin(ref self: ComponentState<TContractState>, member_id: u256) {
+            let admin_permission_manager = get_dep_component!(@self, Admin);
+            admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::GRANT_ADMIN_STATUS);
+
             let caller = get_caller_address();
             assert(self.admin_ca.entry(caller).read(), 'Caller Not an Admin');
             let member_node = self.members.entry(member_id);
@@ -177,6 +190,10 @@ pub mod MemberManagerComponent {
         fn update_member_base_pay(
             ref self: ComponentState<TContractState>, member_id: u256, base_pay: u256,
         ) {
+            let admin_permission_manager = get_dep_component!(@self, Admin);
+            admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::CHANGE_BASE_SALARIES);
+
             let caller = get_caller_address();
             assert(self.admin_ca.entry(caller).read(), 'UNAUTHORIZED');
             let member_node = self.members.entry(member_id);
@@ -208,6 +225,10 @@ pub mod MemberManagerComponent {
             ref self: ComponentState<TContractState>,
             member_id: u256 // suspension_duration: u64 //block timestamp operation
         ) {
+            let admin_permission_manager = get_dep_component!(@self, Admin);
+            admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::REMOVE_MEMBER);
+
             let m = self.members.entry(member_id);
             let mut member = m.member.read();
             member.suspend();
@@ -219,6 +240,10 @@ pub mod MemberManagerComponent {
         /// ### Parameters
         /// - `member_id`: ID of the member
         fn reinstate_member(ref self: ComponentState<TContractState>, member_id: u256) {
+            let admin_permission_manager = get_dep_component!(@self, Admin);
+            admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::ADD_MEMBER);
+
             let mut member = self.members.entry(member_id).member.read();
             member.reinstate();
             self.members.entry(member_id).member.write(member);
@@ -261,6 +286,10 @@ pub mod MemberManagerComponent {
             // For this protocol, the member must accept before other admins verify the member...
             // this can only happen when the member config requires multisig.
             // let id: u256 = (self.member_count.read() + 1).into();
+            let admin_permission_manager = get_dep_component!(@self, Admin);
+            admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::SEND_MEMBER_INVITES);
+
             let caller = get_caller_address();
             assert(self.admin_ca.entry(caller).read(), 'UNAUTHORIZED CALLER');
             assert(role <= 2 && role >= 0, 'Invalid Role');

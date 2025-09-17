@@ -1,14 +1,24 @@
 #[starknet::contract]
 pub mod MockMemberManager {
+    use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
     use littlefinger::components::member_manager::MemberManagerComponent;
     use starknet::ContractAddress;
     use starknet::storage::MutableVecTrait;
 
     component!(path: MemberManagerComponent, storage: member_manager, event: MemberManagerEvent);
+    component!(
+        path: AdminPermissionManagerComponent,
+        storage: admin_permission_manager,
+        event: AdminPermissionManagerEvent,
+    );
 
     #[abi(embed_v0)]
     pub impl MemberManagerImpl =
         MemberManagerComponent::MemberManager<ContractState>;
+
+    #[abi(embed_v0)]
+    impl AdminPermissionManagerImpl =
+        AdminPermissionManagerComponent::AdminPermissionManagerImpl<ContractState>;
 
     pub impl InternalImpl = MemberManagerComponent::InternalImpl<ContractState>;
 
@@ -16,6 +26,8 @@ pub mod MockMemberManager {
     pub struct Storage {
         #[substorage(v0)]
         pub member_manager: MemberManagerComponent::Storage,
+        #[substorage(v0)]
+        pub admin_permission_manager: AdminPermissionManagerComponent::Storage,
     }
 
     #[event]
@@ -23,6 +35,8 @@ pub mod MockMemberManager {
     enum Event {
         #[flat]
         MemberManagerEvent: MemberManagerComponent::Event,
+        #[flat]
+        AdminPermissionManagerEvent: AdminPermissionManagerComponent::Event,
     }
 
     #[constructor]

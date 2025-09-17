@@ -13,7 +13,9 @@
 #[starknet::contract]
 pub mod Vault {
     use core::num::traits::Zero;
+    use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
     use littlefinger::interfaces::ivault::IVault;
+    use littlefinger::structs::admin_permissions::AdminPermission;
     use littlefinger::structs::vault_structs::{Transaction, TransactionType, VaultStatus};
     use openzeppelin::access::ownable::OwnableComponent;
     use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
@@ -29,6 +31,15 @@ pub mod Vault {
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
     component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+    component!(
+        path: AdminPermissionManagerComponent,
+        storage: admin_permission_manager,
+        event: AdminPermissionManagerEvent,
+    );
+
+    #[abi(embed_v0)]
+    impl AdminPermissionManagerImpl =
+        AdminPermissionManagerComponent::AdminPermissionManagerImpl<ContractState>;
 
     /// Defines the storage layout for the `Vault` contract.
     #[storage]
@@ -55,6 +66,9 @@ pub mod Vault {
         /// Substorage for the Upgradeable component.
         #[substorage(v0)]
         upgradeable: UpgradeableComponent::Storage,
+        /// Substorage for the AdminPermissionManager component.
+        #[substorage(v0)]
+        admin_permission_manager: AdminPermissionManagerComponent::Storage,
     }
 
     /// Events emitted by the `Vault` contract.
@@ -83,6 +97,9 @@ pub mod Vault {
         /// Flat event for Upgradeable component events.
         #[flat]
         UpgradeableEvent: UpgradeableComponent::Event,
+        /// Flat event for AdminPermissionManager component events.
+        #[flat]
+        AdminPermissionManagerEvent: AdminPermissionManagerComponent::Event,
     }
 
     /// Event data for a successful deposit.
@@ -238,6 +255,10 @@ pub mod Vault {
             amount: u256,
             to_address: ContractAddress,
         ) {
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
+
             assert(amount.is_non_zero(), 'Invalid Amount');
             assert(to_address.is_non_zero(), 'Invalid Address');
             assert(self.is_token_acceptable(token), 'Token not accepted');
@@ -276,6 +297,10 @@ pub mod Vault {
         fn add_to_bonus_allocation(
             ref self: ContractState, token: ContractAddress, amount: u256, address: ContractAddress,
         ) {
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
+
             let caller = get_caller_address();
             assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
             assert(self.permitted_addresses.entry(address).read(), 'Deep Caller Not Permitted');
@@ -297,6 +322,10 @@ pub mod Vault {
         /// - If the caller is not a permitted address.
         /// - If the vault is already frozen.
         fn emergency_freeze(ref self: ContractState) {
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
+
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
@@ -311,6 +340,10 @@ pub mod Vault {
         /// - If the caller is not a permitted address.
         /// - If the vault is not currently frozen.
         fn unfreeze_vault(ref self: ContractState) {
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
+
             let caller = get_caller_address();
             let permitted = self.permitted_addresses.entry(caller).read();
             assert(permitted, 'Direct Caller not permitted');
@@ -338,6 +371,10 @@ pub mod Vault {
             recipient: ContractAddress,
             amount: u256,
         ) {
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
+
             assert(recipient.is_non_zero(), 'Invalid Address');
             assert(amount.is_non_zero(), 'Invalid Amount');
             assert(self.is_token_acceptable(token), 'Token not accepted');
@@ -365,8 +402,11 @@ pub mod Vault {
         /// - If the `token` address is zero.
         /// - If the `token` has already been accepted.
         fn add_accepted_token(ref self: ContractState, token: ContractAddress) {
-            let caller = get_caller_address();
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
 
+            let caller = get_caller_address();
             assert(token.is_non_zero(), 'Invalid token address');
             assert(!self.is_token_acceptable(token), 'Token already accepted');
             assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
@@ -381,6 +421,10 @@ pub mod Vault {
         /// ### Parameters
         /// - `token`: The `ContractAddress` of the token to be removed.
         fn remove_accepted_token(ref self: ContractState, token: ContractAddress) {
+            self
+                .admin_permission_manager
+                .has_admin_permission(get_caller_address(), AdminPermission::VAULT_FUNCTIONS);
+
             let caller = get_caller_address();
             assert(self.is_token_acceptable(token), 'Token not accepted');
             assert(self.permitted_addresses.entry(caller).read(), 'Direct Caller not permitted');
