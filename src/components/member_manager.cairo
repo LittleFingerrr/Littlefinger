@@ -10,9 +10,9 @@
 /// It also interacts with a factory contract to coordinate state across a broader system.
 #[starknet::component]
 pub mod MemberManagerComponent {
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use core::num::traits::Zero;
     use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
-    use littlefinger::interfaces::iadmin_permission_manager::IAdminPermissionManager;
     use littlefinger::interfaces::ifactory::{IFactoryDispatcher, IFactoryDispatcherTrait};
     // use littlefinger::interfaces::icore::IConfig;
     use littlefinger::interfaces::imember_manager::IMemberManager;
@@ -90,7 +90,7 @@ pub mod MemberManagerComponent {
             // Will have to find another means to hash the id, or not. Let us see how things go
             let admin_permission_manager = get_dep_component!(@self, Admin);
             admin_permission_manager
-                .has_admin_permission(get_caller_address(), AdminPermission::ADD_MEMBER);
+                .require_admin_permission(get_caller_address(), AdminPermission::ADD_MEMBER);
 
             let caller = get_caller_address();
             let id: u256 = self.member_count.read() + 1;
@@ -130,10 +130,9 @@ pub mod MemberManagerComponent {
         fn add_admin(ref self: ComponentState<TContractState>, member_id: u256) {
             let admin_permission_manager = get_dep_component!(@self, Admin);
             admin_permission_manager
-                .has_admin_permission(get_caller_address(), AdminPermission::GRANT_ADMIN_STATUS);
-
-            let caller = get_caller_address();
-            assert(self.admin_ca.entry(caller).read(), 'Caller Not an Admin');
+                .require_admin_permission(
+                    get_caller_address(), AdminPermission::GRANT_ADMIN_STATUS,
+                );
             let member_node = self.members.entry(member_id);
             let mut member = member_node.member.read();
             // let old_role = member.role;
@@ -192,10 +191,9 @@ pub mod MemberManagerComponent {
         ) {
             let admin_permission_manager = get_dep_component!(@self, Admin);
             admin_permission_manager
-                .has_admin_permission(get_caller_address(), AdminPermission::CHANGE_BASE_SALARIES);
-
-            let caller = get_caller_address();
-            assert(self.admin_ca.entry(caller).read(), 'UNAUTHORIZED');
+                .require_admin_permission(
+                    get_caller_address(), AdminPermission::CHANGE_BASE_SALARIES,
+                );
             let member_node = self.members.entry(member_id);
             let mut member = member_node.member.read();
             assert(member.is_member(), 'INVALID MEMBER ID');
@@ -227,7 +225,7 @@ pub mod MemberManagerComponent {
         ) {
             let admin_permission_manager = get_dep_component!(@self, Admin);
             admin_permission_manager
-                .has_admin_permission(get_caller_address(), AdminPermission::REMOVE_MEMBER);
+                .require_admin_permission(get_caller_address(), AdminPermission::REMOVE_MEMBER);
 
             let m = self.members.entry(member_id);
             let mut member = m.member.read();
@@ -242,7 +240,7 @@ pub mod MemberManagerComponent {
         fn reinstate_member(ref self: ComponentState<TContractState>, member_id: u256) {
             let admin_permission_manager = get_dep_component!(@self, Admin);
             admin_permission_manager
-                .has_admin_permission(get_caller_address(), AdminPermission::ADD_MEMBER);
+                .require_admin_permission(get_caller_address(), AdminPermission::ADD_MEMBER);
 
             let mut member = self.members.entry(member_id).member.read();
             member.reinstate();
@@ -288,10 +286,10 @@ pub mod MemberManagerComponent {
             // let id: u256 = (self.member_count.read() + 1).into();
             let admin_permission_manager = get_dep_component!(@self, Admin);
             admin_permission_manager
-                .has_admin_permission(get_caller_address(), AdminPermission::SEND_MEMBER_INVITES);
+                .require_admin_permission(
+                    get_caller_address(), AdminPermission::SEND_MEMBER_INVITES,
+                );
 
-            let caller = get_caller_address();
-            assert(self.admin_ca.entry(caller).read(), 'UNAUTHORIZED CALLER');
             assert(role <= 2 && role >= 0, 'Invalid Role');
             let mut actual_role = MemberRole::EMPLOYEE(1);
             if (role == 0) {

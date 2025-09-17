@@ -20,6 +20,7 @@ pub mod OrganizationComponent {
         OrganizationConfigNode, OrganizationInfo, OrganizationType,
     };
     use super::super::member_manager::MemberManagerComponent;
+    use MemberManagerComponent::MemberInternalTrait;
 
 
     /// Defines the storage layout for the `OrganizationComponent`.
@@ -110,9 +111,7 @@ pub mod OrganizationComponent {
             expiry: Option<u64>,
         ) {
             let member_component = get_dep_component!(@self, Member);
-            let caller = get_caller_address();
-            let is_admin = member_component.admin_ca.entry(caller).read();
-            assert(is_admin, 'Caller Not Permitted');
+            member_component.assert_admin();
 
             let contract = Contract {
                 id: self.contract_counter.read().into(),
@@ -138,9 +137,7 @@ pub mod OrganizationComponent {
             expiry: Option<u64>,
         ) {
             let member_component = get_dep_component!(@self, Member);
-            let caller = get_caller_address();
-            let is_admin = member_component.admin_ca.entry(caller).read();
-            assert(is_admin, 'Caller Not Permitted');
+            member_component.assert_admin();
 
             let contract = Contract {
                 id: self.contract_counter.read().into(),

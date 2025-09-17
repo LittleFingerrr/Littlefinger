@@ -11,7 +11,10 @@ pub mod VotingComponent {
         ThresholdChanged, Voted, VotingConfig, VotingConfigNode,
     };
     use crate::structs::member_structs::{MemberRoleIntoU16, MemberTrait};
+    use crate::structs::admin_permissions::AdminPermission;
     use super::super::member_manager::MemberManagerComponent;
+    use super::super::admin_permission_manager::AdminPermissionManagerComponent;
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
 
     #[storage]
     pub struct Storage {
@@ -41,6 +44,7 @@ pub mod VotingComponent {
         +HasComponent<TContractState>,
         +Drop<TContractState>,
         impl Member: MemberManagerComponent::HasComponent<TContractState>,
+        impl AdminPermissionManager: AdminPermissionManagerComponent::HasComponent<TContractState>,
     > of IVote<ComponentState<TContractState>> {
         // revamp
         // add additional creator member details to the poll struct if necessary
@@ -153,14 +157,15 @@ pub mod VotingComponent {
         fn set_threshold(
             ref self: ComponentState<TContractState>, new_threshold: u256, member_id: u256,
         ) {
-            // Protect this with permissions later
             let caller = get_caller_address();
             let mc = get_dep_component!(@self, Member);
             let member = mc.members.entry(member_id).member.read();
             member.verify(caller);
 
-            let role_in_u16 = MemberRoleIntoU16::into(member.role);
-            assert(role_in_u16 >= self.min_role_for_executing.read(), 'Setter not qualified');
+            // Check if caller has admin permissions to change threshold
+            let admin_permission_manager = get_dep_component!(@self, AdminPermissionManager);
+            admin_permission_manager
+                .require_admin_permission(caller, AdminPermission::GRANT_PERMISSIONS);
 
             let previous_threshold = self.generic_threshold.read();
             self.generic_threshold.write(new_threshold);

@@ -17,6 +17,7 @@ mod Core {
     use MemberManagerComponent::MemberInternalTrait;
     use OrganizationComponent::OrganizationInternalTrait;
     use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use littlefinger::components::dao_controller::VotingComponent;
     use littlefinger::components::disbursement::DisbursementComponent;
     use littlefinger::components::member_manager::MemberManagerComponent;
@@ -185,6 +186,7 @@ mod Core {
             );
         self.vault_address.write(vault_address);
         self.disbursement._init(owner);
+        self.admin_permission_manager.initialize_admin_permissions(owner);
         self.ownable.initializer(owner);
     }
 
@@ -228,7 +230,7 @@ mod Core {
         ) {
             self
                 .admin_permission_manager
-                .has_admin_permission(
+                .require_admin_permission(
                     get_caller_address(), AdminPermission::SET_DISBURSEMENT_SCHEDULES,
                 );
 
@@ -247,8 +249,11 @@ mod Core {
         /// - If the payout is attempted before the required interval has passed since the last
         /// execution.
         fn schedule_payout(ref self: ContractState, token: ContractAddress) {
-            // self.admin_permission_manager.has_admin_permission(get_caller_address(),
-            // AdminPermission::);
+            self
+                .admin_permission_manager
+                .require_admin_permission(
+                    get_caller_address(), AdminPermission::SET_DISBURSEMENT_SCHEDULES,
+                );
 
             let members = self.member.get_members();
             let no_of_members = members.len();
