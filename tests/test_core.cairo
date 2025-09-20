@@ -1,3 +1,6 @@
+use littlefinger::interfaces::iadmin_permission_manager::{
+    IAdminPermissionManagerDispatcher, IAdminPermissionManagerDispatcherTrait,
+};
 use littlefinger::interfaces::icore::{ICoreDispatcher, ICoreDispatcherTrait};
 use littlefinger::interfaces::idisbursement::{
     IDisbursementDispatcher, IDisbursementDispatcherTrait,
@@ -7,6 +10,7 @@ use littlefinger::interfaces::imember_manager::{
     IMemberManagerDispatcher, IMemberManagerDispatcherTrait,
 };
 use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
+use littlefinger::structs::admin_permissions::AdminPermission;
 use littlefinger::structs::disbursement_structs::{ScheduleStatus, ScheduleType};
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
@@ -207,6 +211,15 @@ fn setup_full_organization() -> (
     start_cheat_caller_address(vault_address, owner);
     vault_dispatcher.deposit_funds(token_address, 5000000000000000000000, owner);
     vault_dispatcher.add_to_bonus_allocation(token_address, 1000000000000000000000, owner);
+    stop_cheat_caller_address(vault_address);
+
+    // Grant necessary permissions to the core contract for vault operations
+    let vault_admin_permission_manager = IAdminPermissionManagerDispatcher {
+        contract_address: vault_address,
+    };
+    start_cheat_caller_address(vault_address, owner);
+    vault_admin_permission_manager
+        .grant_admin_permission(core_address, AdminPermission::VAULT_FUNCTIONS);
     stop_cheat_caller_address(vault_address);
 
     (
@@ -569,3 +582,52 @@ fn test_schedule_payout_successful() {
 
     stop_cheat_block_timestamp(core_address);
 }
+
+#[test]
+#[should_panic(expected: 'Insufficient admin permissions')]
+fn test_schedule_payout_insufficient_permissions() {
+    let (
+        core_dispatcher,
+        core_address,
+        _vault_dispatcher,
+        _vault_address,
+        _token_dispatcher,
+        _token_address,
+        owner,
+    ) =
+        setup_full_organization();
+
+    // Add a member who will be an admin but without PAY_MEMBERS permission
+    let admin_without_pay_permission = contract_address_const::<'admin_no_pay'>();
+
+    // Use the member manager interface to add the member
+    let member_manager = IMemberManagerDispatcher { contract_address: core_address };
+    start_cheat_caller_address(core_address, owner);
+    member_manager.add_member('Admin', 'NoPay', 'admin_no_pay', 11, admin_without_pay_permission);
+
+    // Grant some permissions but NOT PAY_MEMBERS
+    let admin_permission_manager = IAdminPermissionManagerDispatcher {
+        contract_address: core_address,
+    };
+    admin_permission_manager
+        .grant_admin_permission(admin_without_pay_permission, AdminPermission::ADD_MEMBER);
+    admin_permission_manager
+        .grant_admin_permission(
+            admin_without_pay_permission, AdminPermission::SET_DISBURSEMENT_SCHEDULES,
+        );
+    stop_cheat_caller_address(core_address);
+
+    // Setup a disbursement schedule
+    start_cheat_caller_address(core_address, owner);
+    core_dispatcher.initialize_disbursement_schedule(0, 1000, 2000, 100);
+    stop_cheat_caller_address(core_address);
+
+    // Try to call schedule_payout with the admin who doesn't have PAY_MEMBERS permission
+    // This should fail with 'Insufficient admin permissions'
+    start_cheat_block_timestamp(core_address, 1500);
+    start_cheat_caller_address(core_address, admin_without_pay_permission);
+    core_dispatcher.schedule_payout(_token_address);
+    stop_cheat_caller_address(core_address);
+    stop_cheat_block_timestamp(core_address);
+}
+

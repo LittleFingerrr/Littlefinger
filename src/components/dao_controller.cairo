@@ -1,16 +1,19 @@
 #[starknet::component]
 pub mod VotingComponent {
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
     // use crate::interfaces::icore::IConfig;
     use crate::interfaces::dao_controller::IVote;
+    use crate::structs::admin_permissions::AdminPermission;
     use crate::structs::dao_controller::{
         Poll, PollCreated, PollReason, PollResolved, PollStatus, PollStopped, PollTrait,
         ThresholdChanged, Voted, VotingConfig, VotingConfigNode,
     };
     use crate::structs::member_structs::{MemberRoleIntoU16, MemberTrait};
+    use super::super::admin_permission_manager::AdminPermissionManagerComponent;
     use super::super::member_manager::MemberManagerComponent;
 
     #[storage]
@@ -41,6 +44,7 @@ pub mod VotingComponent {
         +HasComponent<TContractState>,
         +Drop<TContractState>,
         impl Member: MemberManagerComponent::HasComponent<TContractState>,
+        impl AdminPermissionManager: AdminPermissionManagerComponent::HasComponent<TContractState>,
     > of IVote<ComponentState<TContractState>> {
         // revamp
         // add additional creator member details to the poll struct if necessary
@@ -140,8 +144,9 @@ pub mod VotingComponent {
             let max_no_of_possible_approvals = max_possible_of_voters - poll.down_votes;
 
             if max_no_of_possible_approvals < threshold {
-                let outcome = poll.resolve(threshold);
-                self.emit(PollResolved { id: poll_id, outcome, timestamp })
+                // Poll is rejected because it's impossible to reach threshold
+                poll.status = PollStatus::FINISHED(false);
+                self.emit(PollResolved { id: poll_id, outcome: false, timestamp })
             }
 
             self.has_voted.entry((caller, poll_id)).write(true);
@@ -153,14 +158,15 @@ pub mod VotingComponent {
         fn set_threshold(
             ref self: ComponentState<TContractState>, new_threshold: u256, member_id: u256,
         ) {
-            // Protect this with permissions later
             let caller = get_caller_address();
             let mc = get_dep_component!(@self, Member);
             let member = mc.members.entry(member_id).member.read();
             member.verify(caller);
 
-            let role_in_u16 = MemberRoleIntoU16::into(member.role);
-            assert(role_in_u16 >= self.min_role_for_executing.read(), 'Setter not qualified');
+            // Check if caller has admin permissions to change threshold
+            let admin_permission_manager = get_dep_component!(@self, AdminPermissionManager);
+            admin_permission_manager
+                .require_admin_permission(caller, AdminPermission::GRANT_PERMISSIONS);
 
             let previous_threshold = self.generic_threshold.read();
             self.generic_threshold.write(new_threshold);
@@ -175,7 +181,7 @@ pub mod VotingComponent {
         fn get_all_polls(self: @ComponentState<TContractState>) -> Array<Poll> {
             let mut poll_array = array![];
 
-            for i in 0..(self.no_of_polls.read() + 1) {
+            for i in 0..self.no_of_polls.read() {
                 let current_poll = self.polls.entry(i).read();
                 poll_array.append(current_poll);
             }

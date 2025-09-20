@@ -14,14 +14,17 @@
 /// - `OwnableComponent` and `UpgradeableComponent`: For access control and contract upgrades.
 #[starknet::contract]
 mod Core {
+    use AdminPermissionManagerComponent::AdminPermissionManagerInternalTrait;
     use MemberManagerComponent::MemberInternalTrait;
     use OrganizationComponent::OrganizationInternalTrait;
+    use littlefinger::components::admin_permission_manager::AdminPermissionManagerComponent;
     use littlefinger::components::dao_controller::VotingComponent;
     use littlefinger::components::disbursement::DisbursementComponent;
     use littlefinger::components::member_manager::MemberManagerComponent;
     use littlefinger::components::organization::OrganizationComponent;
     use littlefinger::interfaces::icore::ICore;
     use littlefinger::interfaces::ivault::{IVaultDispatcher, IVaultDispatcherTrait};
+    use littlefinger::structs::admin_permissions::AdminPermission;
     use littlefinger::structs::disbursement_structs::ScheduleStatus;
     // use littlefinger::structs::organization::{OrganizationConfig, OrganizationInfo, OwnerInit};
     use littlefinger::structs::member_structs::MemberRoleIntoU16;
@@ -29,7 +32,9 @@ mod Core {
     use openzeppelin::upgrades::UpgradeableComponent;
     use openzeppelin::upgrades::interface::IUpgradeable;
     use starknet::storage::StoragePointerWriteAccess;
-    use starknet::{ClassHash, ContractAddress, get_block_timestamp, get_contract_address};
+    use starknet::{
+        ClassHash, ContractAddress, get_block_timestamp, get_caller_address, get_contract_address,
+    };
     use crate::interfaces::imember_manager::IMemberManager;
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
@@ -38,6 +43,11 @@ mod Core {
     component!(path: OrganizationComponent, storage: organization, event: OrganizationEvent);
     component!(path: VotingComponent, storage: voting, event: VotingEvent);
     component!(path: DisbursementComponent, storage: disbursement, event: DisbursementEvent);
+    component!(
+        path: AdminPermissionManagerComponent,
+        storage: admin_permission_manager,
+        event: AdminPermissionManagerEvent,
+    );
 
     #[abi(embed_v0)]
     impl MemberImpl = MemberManagerComponent::MemberManager<ContractState>;
@@ -49,14 +59,16 @@ mod Core {
         OrganizationComponent::OrganizationManager<ContractState>;
     #[abi(embed_v0)]
     impl VotingImpl = VotingComponent::VotingImpl<ContractState>;
+    #[abi(embed_v0)]
+    impl AdminPermissionManagerImpl =
+        AdminPermissionManagerComponent::AdminPermissionManagerImpl<ContractState>;
 
     #[abi(embed_v0)]
     impl OwnableMixinImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
-
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
-
     impl DisbursementInternalImpl = DisbursementComponent::InternalImpl<ContractState>;
+
 
     /// Defines the storage layout for the `Core` contract.
     #[storage]
@@ -81,7 +93,10 @@ mod Core {
         voting: VotingComponent::Storage, //my component
         /// Substorage for the Disbursement component.
         #[substorage(v0)]
-        disbursement: DisbursementComponent::Storage //my component
+        disbursement: DisbursementComponent::Storage, //my component
+        /// Substorage for the AdminPermissionManager component.
+        #[substorage(v0)]
+        admin_permission_manager: AdminPermissionManagerComponent::Storage //my component
     }
 
     /// Events emitted by the `Core` contract, including events from all its components.
@@ -106,6 +121,9 @@ mod Core {
         /// Emits disbursement-related events.
         #[flat]
         DisbursementEvent: DisbursementComponent::Event,
+        /// Emits admin permission manager-related events.
+        #[flat]
+        AdminPermissionManagerEvent: AdminPermissionManagerComponent::Event,
     }
 
     // #[derive(Drop, Copy, Serde)]
@@ -168,6 +186,7 @@ mod Core {
             );
         self.vault_address.write(vault_address);
         self.disbursement._init(owner);
+        self.admin_permission_manager.initialize_admin_permissions(owner);
         self.ownable.initializer(owner);
     }
 
@@ -209,6 +228,12 @@ mod Core {
             end: u64,
             interval: u64,
         ) {
+            self
+                .admin_permission_manager
+                .require_admin_permission(
+                    get_caller_address(), AdminPermission::SET_DISBURSEMENT_SCHEDULES,
+                );
+
             self.disbursement._initialize(schedule_type, start, end, interval)
         }
 
@@ -224,6 +249,10 @@ mod Core {
         /// - If the payout is attempted before the required interval has passed since the last
         /// execution.
         fn schedule_payout(ref self: ContractState, token: ContractAddress) {
+            self
+                .admin_permission_manager
+                .require_admin_permission(get_caller_address(), AdminPermission::PAY_MEMBERS);
+
             let members = self.member.get_members();
             let no_of_members = members.len();
 

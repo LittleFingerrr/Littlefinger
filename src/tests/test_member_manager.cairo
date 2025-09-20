@@ -74,9 +74,9 @@ fn test_add_member_successful() {
 
     let (fname, lname, alias, role, member) = member_details();
 
-    let caller = caller();
+    let admin_addr = admin(); // Use admin instead of caller
 
-    start_cheat_caller_address(mock_contract.contract_address, caller);
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member);
 
     let member_response = mock_contract.get_member(2);
@@ -95,10 +95,10 @@ fn test_add_member_with_factory_and_core_org_successful() {
 
     let (fname, lname, alias, role, member) = member_details();
 
-    let caller = caller();
+    let admin_addr = admin(); // Use admin instead of caller
     let (factory_address, _, core_org_address, vault_address) = setup_factory_and_org_helper();
 
-    start_cheat_caller_address(mock_contract.contract_address, caller);
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member);
 
     let member_response = mock_contract.get_member(2);
@@ -120,10 +120,9 @@ fn test_add_admin_successful() {
 
     let (fname, lname, alias, role, member) = member_details();
 
-    let caller = caller();
-    let admin = admin();
+    let admin_addr = admin();
 
-    start_cheat_caller_address(mock_contract.contract_address, caller);
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member);
     let mut member_response = mock_contract.get_member(2);
     stop_cheat_caller_address(mock_contract.contract_address);
@@ -134,7 +133,7 @@ fn test_add_admin_successful() {
     assert(MemberRoleIntoU16::into(member_response.role) == role, 'Wrong role');
     assert(member_response.address == member, 'Wrong address');
 
-    start_cheat_caller_address(mock_contract.contract_address, admin);
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_admin(1);
     member_response = mock_contract.get_member(1);
     stop_cheat_caller_address(mock_contract.contract_address);
@@ -143,17 +142,21 @@ fn test_add_admin_successful() {
 }
 
 #[test]
-#[should_panic(expected: 'Caller Not an Admin')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_add_admin_not_admin() {
     let mock_contract = deploy_mock_contract();
     let (fname, lname, alias, role, member) = member_details();
-
+    let admin_addr = admin();
     let caller = caller();
 
-    start_cheat_caller_address(mock_contract.contract_address, caller);
+    // Add member as admin first
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member);
-    let mut _member_response = mock_contract.get_member(1);
-    mock_contract.add_admin(1);
+    stop_cheat_caller_address(mock_contract.contract_address);
+
+    // Try to add admin as non-admin (should fail)
+    start_cheat_caller_address(mock_contract.contract_address, caller);
+    mock_contract.add_admin(2);
     stop_cheat_caller_address(mock_contract.contract_address);
 }
 
@@ -162,12 +165,15 @@ fn test_update_member_details_successful() {
     let mock_contract = deploy_mock_contract();
 
     let (fname, lname, alias, role, member_addr) = member_details();
+    let admin_addr = admin();
 
-    // Add member first
-    start_cheat_caller_address(mock_contract.contract_address, member_addr);
+    // Add member first as admin
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member_addr);
+    stop_cheat_caller_address(mock_contract.contract_address);
 
-    // Update member details
+    // Update member details as the member themselves
+    start_cheat_caller_address(mock_contract.contract_address, member_addr);
     let new_fname = 'Jane';
     let new_lname = 'Smith';
     let new_alias = 'janesmith';
@@ -192,38 +198,39 @@ fn test_update_member_base_pay_successful() {
     let (fname, lname, alias, role, member_addr) = member_details();
     let admin_addr = admin();
 
-    // Add member first
-    start_cheat_caller_address(mock_contract.contract_address, member_addr);
+    // Add member first as admin
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member_addr);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     // Update base pay as admin
     let new_base_pay = 50000;
     start_cheat_caller_address(mock_contract.contract_address, admin_addr);
-    mock_contract.update_member_base_pay(1, new_base_pay);
+    mock_contract.update_member_base_pay(2, new_base_pay); // Member ID is 2, not 1
 
-    let retrieved_pay = mock_contract.get_member_base_pay(1);
+    let retrieved_pay = mock_contract.get_member_base_pay(2);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     assert(retrieved_pay == new_base_pay, 'Wrong base pay');
 }
 
 #[test]
-#[should_panic(expected: 'UNAUTHORIZED')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_update_member_base_pay_unauthorized() {
     let mock_contract = deploy_mock_contract();
 
     let (fname, lname, alias, role, member_addr) = member_details();
+    let admin_addr = admin();
     let unauthorized_caller = caller();
 
-    // Add member first
-    start_cheat_caller_address(mock_contract.contract_address, member_addr);
+    // Add member first as admin
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member_addr);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     // Try to update base pay as non-admin (should fail)
     start_cheat_caller_address(mock_contract.contract_address, unauthorized_caller);
-    mock_contract.update_member_base_pay(1, 50000);
+    mock_contract.update_member_base_pay(2, 50000);
     stop_cheat_caller_address(mock_contract.contract_address);
 }
 
@@ -234,22 +241,22 @@ fn test_suspend_and_reinstate_member() {
     let (fname, lname, alias, role, member_addr) = member_details();
     let admin_addr = admin();
 
-    // Add member first
-    start_cheat_caller_address(mock_contract.contract_address, member_addr);
+    // Add member first as admin
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname, lname, alias, role, member_addr);
     stop_cheat_caller_address(mock_contract.contract_address);
 
-    // Suspend member
+    // Suspend member as admin
     start_cheat_caller_address(mock_contract.contract_address, admin_addr);
-    mock_contract.suspend_member(1);
+    mock_contract.suspend_member(2); // Member ID is 2
 
-    let suspended_member = mock_contract.get_member(1);
+    let suspended_member = mock_contract.get_member(2);
     assert(suspended_member.status == MemberStatus::SUSPENDED, 'Member not suspended');
 
     // Reinstate member
-    mock_contract.reinstate_member(1);
+    mock_contract.reinstate_member(2);
 
-    let reinstated_member = mock_contract.get_member(1);
+    let reinstated_member = mock_contract.get_member(2);
     stop_cheat_caller_address(mock_contract.contract_address);
 
     assert(reinstated_member.status == MemberStatus::ACTIVE, 'Member not reinstated');
@@ -260,6 +267,7 @@ fn test_get_members() {
     let mock_contract = deploy_mock_contract();
 
     let (fname1, lname1, alias1, role1, member1_addr) = member_details();
+    let admin_addr = admin();
 
     let fname2 = 'Jane';
     let lname2 = 'Smith';
@@ -267,13 +275,11 @@ fn test_get_members() {
     let role2 = 3;
     let member2_addr = member2();
 
-    // Add first member
-    start_cheat_caller_address(mock_contract.contract_address, member1_addr);
+    // Add first member as admin
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member(fname1, lname1, alias1, role1, member1_addr);
-    stop_cheat_caller_address(mock_contract.contract_address);
 
-    // Add second member
-    start_cheat_caller_address(mock_contract.contract_address, member2_addr);
+    // Add second member as admin
     mock_contract.add_member(fname2, lname2, alias2, role2, member2_addr);
     stop_cheat_caller_address(mock_contract.contract_address);
 
@@ -331,7 +337,7 @@ fn test_invite_member_successful() {
 }
 
 #[test]
-#[should_panic(expected: 'UNAUTHORIZED CALLER')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_invite_member_unauthorized() {
     let mock_contract = deploy_mock_contract();
     let unauthorized_caller = caller();
@@ -417,9 +423,10 @@ fn test_accept_invite_successful() {
 fn test_get_role_value() {
     let mock_contract = deploy_mock_contract();
     let member_addr = member();
+    let admin_addr = admin();
 
-    // Add member first
-    start_cheat_caller_address(mock_contract.contract_address, member_addr);
+    // Add member first as admin
+    start_cheat_caller_address(mock_contract.contract_address, admin_addr);
     mock_contract.add_member('John', 'Doe', 'johndoe', 5, member_addr);
     stop_cheat_caller_address(mock_contract.contract_address);
 
@@ -446,7 +453,7 @@ fn test_update_member_details_invalid_member() {
 }
 
 #[test]
-#[should_panic(expected: 'Zero Address Caller')]
+#[should_panic(expected: 'Insufficient admin permissions')]
 fn test_add_member_zero_address() {
     let mock_contract = deploy_mock_contract();
 
